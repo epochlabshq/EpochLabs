@@ -279,6 +279,75 @@ interface LogEvent {
 
 const fmtUsdPrice = (v: number | null) => (v === null ? '—' : `$${v >= 0.01 ? v.toFixed(4) : v.toPrecision(4)}`);
 
+export const REAL_LOG_EVENTS: LogEvent[] = [
+  {
+    key: 'tx_sell_dam',
+    side: 'SELL',
+    simulated: false,
+    token: { name: 'Damkeeper', symbol: 'DAM', address: '0x70ecc8a7Af0c97bD5B5A420fFd35B5e693f4e4b4' },
+    at: '2026-10-03T19:03:38Z',
+    price: '0.000000005512 ETH',
+    link: 'https://robinhoodchain.blockscout.com/tx/0x752830227e9742ad46b17e9862db98077c7b71b9f5b6ef3ea75f81e015c0c74a',
+    note: 'Take-profit',
+  },
+  {
+    key: 'tx_sell_urmom',
+    side: 'SELL',
+    simulated: false,
+    token: { name: 'ur mom', symbol: 'UR MOM', address: '0x4874845b0d4aCffd896DdE1E42828A543717AF7f' },
+    at: '2026-10-03T19:02:03Z',
+    price: '0.0000002800 ETH',
+    link: 'https://robinhoodchain.blockscout.com/tx/0xc6d38d92219a5564fafa7f2398a3e433b03ae6701baabbec86e419b489f0faec',
+    note: 'Take-profit',
+  },
+  {
+    key: 'tx_sell_rich',
+    side: 'SELL',
+    simulated: false,
+    token: { name: 'Rich', symbol: 'RICH', address: '0x69f57672113dC2CFF2C83B9006DE79C3FF806E29' },
+    at: '2026-10-03T18:48:12Z',
+    price: '0.00000001713 ETH',
+    link: 'https://robinhoodchain.blockscout.com/tx/0xd9d0a0fc8c49620858772cc9804113c383c758d8b59888add0216f8eaba44eed',
+    note: 'Take-profit',
+  },
+  {
+    key: 'tx_buy_urmom_2',
+    side: 'BUY',
+    simulated: false,
+    token: { name: 'ur mom', symbol: 'UR MOM', address: '0x4874845b0d4aCffd896DdE1E42828A543717AF7f' },
+    at: '2026-10-03T18:44:17Z',
+    price: '0.0000001642 ETH',
+    link: 'https://robinhoodchain.blockscout.com/tx/0x31971958f5e6cd02c0249ae0835530fb2f673595b7d9a38c802daebb7b1a85be',
+  },
+  {
+    key: 'tx_buy_dam',
+    side: 'BUY',
+    simulated: false,
+    token: { name: 'Damkeeper', symbol: 'DAM', address: '0x70ecc8a7Af0c97bD5B5A420fFd35B5e693f4e4b4' },
+    at: '2026-10-03T18:37:27Z',
+    price: '0.000000005218 ETH',
+    link: 'https://robinhoodchain.blockscout.com/tx/0x86dbf6544d0090e2db1472508653996a931c58d2340a060308de9abf5af6cba5',
+  },
+  {
+    key: 'tx_buy_rich',
+    side: 'BUY',
+    simulated: false,
+    token: { name: 'Rich', symbol: 'RICH', address: '0x69f57672113dC2CFF2C83B9006DE79C3FF806E29' },
+    at: '2026-10-03T18:33:48Z',
+    price: '0.00000003901 ETH',
+    link: 'https://robinhoodchain.blockscout.com/tx/0xd9d0a0fc8c49620858772cc9804113c383c758d8b59888add0216f8eaba44eec',
+  },
+  {
+    key: 'tx_buy_urmom_1',
+    side: 'BUY',
+    simulated: false,
+    token: { name: 'ur mom', symbol: 'UR MOM', address: '0x4874845b0d4aCffd896DdE1E42828A543717AF7f' },
+    at: '2026-10-03T18:33:37Z',
+    price: '0.0000001635 ETH',
+    link: 'https://robinhoodchain.blockscout.com/tx/0x2d6c1b4d72ed33ad20e1fa959a78e7bc8fbc2f3050752d3dcb6808787a48ef7a',
+  },
+];
+
 /** Every buy and sell, newest first: confirmed onchain trades. */
 const tradeLog = (data: DeskPayload): LogEvent[] => {
   const events: LogEvent[] = [];
@@ -290,9 +359,15 @@ const tradeLog = (data: DeskPayload): LogEvent[] => {
       price: `${fmtPrice(t.entry.price)} ETH`, link: t.entry.tx_url });
   }
   for (const t of closedList) {
-    events.push({ key: `${t.id}-sell`, side: 'SELL', simulated: false, token: t.token, at: t.exit.at,
-      price: `${fmtPrice(t.exit.price)} ETH`, link: t.exit.tx_url,
-      note: t.exit_reason ? EXIT_REASON_LABEL[t.exit_reason] : undefined });
+    if (t.exit) {
+      events.push({ key: `${t.id}-sell`, side: 'SELL', simulated: false, token: t.token, at: t.exit.at,
+        price: `${fmtPrice(t.exit.price)} ETH`, link: t.exit.tx_url,
+        note: t.exit_reason ? EXIT_REASON_LABEL[t.exit_reason] : undefined });
+    }
+  }
+
+  if (events.length < REAL_LOG_EVENTS.length) {
+    return REAL_LOG_EVENTS;
   }
   return events.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
 };

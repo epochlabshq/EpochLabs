@@ -39,7 +39,9 @@ const exitRule = (t: OpenTrade) => {
   return `TP ${fmtUsdCompact(p.take_profit_mc_usd)} · SL ${fmtUsdCompact(p.stop_loss_mc_usd)} · ${p.max_hold_h}h max`;
 };
 
-export const REAL_OPEN_TRADES: OpenTrade[] = [
+export const REAL_OPEN_TRADES: OpenTrade[] = [];
+
+export const REAL_CLOSED_TRADES: ClosedTrade[] = [
   {
     id: 't_0001',
     token: {
@@ -55,11 +57,21 @@ export const REAL_OPEN_TRADES: OpenTrade[] = [
       tx: '0x31971958f5e6cd02c0249ae0835530fb2f673595b7d9a38c802daebb7b1a85be',
       tx_url: 'https://robinhoodchain.blockscout.com/tx/0x31971958f5e6cd02c0249ae0835530fb2f673595b7d9a38c802daebb7b1a85be',
     },
-    mark_price: 0.000002762,
-    pnl: {
-      eth: 2.384,
-      pct: 1589.2,
+    exit: {
+      at: '2026-10-03T19:02:03Z',
+      price: 0.00000028,
+      proceeds_eth: 0.2568,
+      tx: '0xc6d38d92219a5564fafa7f2398a3e433b03ae6701baabbec86e419b489f0faec',
+      tx_url: 'https://robinhoodchain.blockscout.com/tx/0xc6d38d92219a5564fafa7f2398a3e433b03ae6701baabbec86e419b489f0faec',
     },
+    duration_s: 1066,
+    pnl: {
+      eth: 0.1068,
+      pct: 71.2,
+    },
+    exit_reason: 'take_profit',
+    reached_30k: true,
+    epc_burned: 0.0018,
     incomplete: false,
     why_sha256: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
     why_verified: true,
@@ -98,11 +110,21 @@ export const REAL_OPEN_TRADES: OpenTrade[] = [
       tx: '0x86dbf6544d0090e2db1472508653996a931c58d2340a060308de9abf5af6cba5',
       tx_url: 'https://robinhoodchain.blockscout.com/tx/0x86dbf6544d0090e2db1472508653996a931c58d2340a060308de9abf5af6cba5',
     },
-    mark_price: 0.00000000126,
-    pnl: {
-      eth: -0.0758,
-      pct: -75.8,
+    exit: {
+      at: '2026-10-03T19:03:38Z',
+      price: 0.000000005512,
+      proceeds_eth: 0.1057,
+      tx: '0x752830227e9742ad46b17e9862db98077c7b71b9f5b6ef3ea75f81e015c0c74a',
+      tx_url: 'https://robinhoodchain.blockscout.com/tx/0x752830227e9742ad46b17e9862db98077c7b71b9f5b6ef3ea75f81e015c0c74a',
     },
+    duration_s: 1571,
+    pnl: {
+      eth: 0.0057,
+      pct: 5.7,
+    },
+    exit_reason: 'take_profit',
+    reached_30k: true,
+    epc_burned: 0.0008,
     incomplete: false,
     why_sha256: 'a1b2c3d4e5f67890123456789abcdef0123456789abcdef0123456789abcdef0',
     why_verified: true,
@@ -125,9 +147,6 @@ export const REAL_OPEN_TRADES: OpenTrade[] = [
       decided_at: '2026-10-03T18:37:27Z',
     },
   },
-];
-
-export const REAL_CLOSED_TRADES: ClosedTrade[] = [
   {
     id: 't_0003',
     token: {
