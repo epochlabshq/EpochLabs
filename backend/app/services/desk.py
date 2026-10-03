@@ -105,6 +105,22 @@ def watching_rows(tokens: list[dict], threshold: float, excluded: frozenset[str]
     return rows[:limit]
 
 
+def pinned_watching_rows(pinned: list[dict]) -> list[dict]:
+    """Pinned tokens as Watching rows: tracked only (no score, never bought), listed after the scored ones."""
+    return [{
+        "token": {"name": t["name"], "symbol": t["symbol"], "address": t["mint"],
+                  "dexscreener_url": t.get("pair_url") or f"https://dexscreener.com/robinhood/{t['mint'].lower()}"},
+        "mc_now": float(t["mc_now"]) if t.get("mc_now") is not None else None,
+        "mc_at": t["mc_at"].isoformat() if t.get("mc_at") else None,
+        "peak_mc": float(t["peak_mc"]) if t.get("peak_mc") is not None else None,
+        "launched_at": t["launched_at"].isoformat() if t.get("launched_at") else None,
+        "holders": t.get("holders"),
+        "holders_sampled_at": t["holders_sampled_at"].isoformat() if t.get("holders_sampled_at") else None,
+        "survival": None,
+        "status": "tracking",
+    } for t in pinned]
+
+
 def anonymize_waiting(candidates: list[dict], now: datetime, visible_dropped_h: int) -> list[dict]:
     """
     Waiting slots from desk_candidates rows. Whitelist only: slot number, stage, timing, and a drop reason.

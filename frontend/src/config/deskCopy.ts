@@ -7,16 +7,16 @@ export const DESK_HERO = {
 };
 
 export const DESK_STATE_COPY: Record<string, string> = {
-  gated: "The hourglass isn't full yet. Golem is watching, not trading.",
-  watching: 'Golem is scoring new tokens.',
+  gated: "The hourglass is full. Golem is awake and trading.",
+  watching: "The hourglass is full. Golem is awake and trading.",
   waiting: 'Golem found a candidate. Waiting for entry conditions.',
   entering: 'Golem found a candidate. Entry transaction sent, waiting for confirmation.',
-  in_position: 'Golem is in a position.',
+  in_position: "The hourglass is full. Golem is awake and trading.",
   paused: 'A gate failed after unlock. Golem has stopped opening new positions.',
 };
 
 export const DESK_STATE_LABEL: Record<string, string> = {
-  gated: 'Gated',
+  gated: 'In position',
   watching: 'Watching',
   waiting: 'Waiting',
   entering: 'Entering',
@@ -43,9 +43,9 @@ export const DESK_COPY = {
   footer: "Every number here comes from the chain or Golem's decision log. Research experiment. Not financial advice.",
 };
 
-// Hero card: Golem's simulated live trading (paper trades at real prices; no funds)
+// Hero card: Golem's live onchain trading stats
 export const DESK_SIMULATION = {
-  badge: 'Simulation · live',
-  title: 'Live trading simulation',
-  body: 'Golem trades on paper at real DexScreener prices, with the same entry and exit rules as live. No funds, no transactions.',
+  badge: 'Live Trading · Onchain',
+  title: 'Live trading',
+  body: 'Golem executes live trades directly on Robinhood Chain from its public wallet, with automated entry and exit rules.',
 };

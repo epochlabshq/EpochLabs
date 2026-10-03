@@ -24,7 +24,7 @@ export interface WatchingRow {
   holders: number | null;
   holders_sampled_at: string | null;
   survival: number | null;
-  status: 'scoring' | 'below_threshold' | 'unscored' | 'awaiting_holders' | 'reached_tp' | 'excluded';
+  status: 'scoring' | 'below_threshold' | 'unscored' | 'awaiting_holders' | 'reached_tp' | 'excluded' | 'tracking';
 }
 
 export interface WaitingSlot {

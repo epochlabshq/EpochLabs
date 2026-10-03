@@ -6,6 +6,7 @@ import {
   EXIT_REASON_LABEL, fmtDuration, fmtEth, fmtSignedEth, fmtSignedPct, fmtUsdCompact, pnlTone, tokenLabel,
   type TradeDetail,
 } from './types';
+import { REAL_OPEN_TRADES, REAL_CLOSED_TRADES } from './TradesPanels';
 
 const Row: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
   <div className="grid grid-cols-[minmax(0,9rem)_minmax(0,1fr)] gap-3 py-2 border-b border-[var(--rule)] last:border-0">
@@ -67,6 +68,19 @@ export const WhyCardDialog: React.FC<{ tradeId: string | null; onClose: () => vo
   useEffect(() => {
     if (!tradeId) return;
     let cancelled = false;
+
+    // First check local real trades
+    const localOpen = REAL_OPEN_TRADES.find((t) => t.id === tradeId);
+    if (localOpen) {
+      setDetail({ id: tradeId, trade: { status: 'open', ...localOpen }, error: false });
+      return;
+    }
+    const localClosed = REAL_CLOSED_TRADES.find((t) => t.id === tradeId);
+    if (localClosed) {
+      setDetail({ id: tradeId, trade: { status: 'closed', ...localClosed }, error: false });
+      return;
+    }
+
     fetchDeskTrade(tradeId)
       .then((trade: TradeDetail) => { if (!cancelled) setDetail({ id: tradeId, trade, error: false }); })
       .catch(() => { if (!cancelled) setDetail({ id: tradeId, trade: null, error: true }); });

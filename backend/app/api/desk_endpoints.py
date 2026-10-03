@@ -14,9 +14,10 @@ from app.db.database import AsyncSessionLocal, get_db
 from app.api.endpoints import get_latest_model, serialize_model_run
 from app.api.epochs_endpoints import load_completed
 from app.services import desk_chain
+from app.services.desk_pinned import load_pinned_rows
 from app.services.desk_paper import load_paper_trades, serialize_paper
 from app.services.desk import (
-    Decision, anonymize_waiting, derive_state, gated_reason, group_trades, heartbeat, revealed_drops,
+    Decision, anonymize_waiting, pinned_watching_rows, derive_state, gated_reason, group_trades, heartbeat, revealed_drops,
     serialize_closed, serialize_open, totals, watching_rows, WAITING_STAGES, WEI,
 )
 from app.services.golem_guard import trade_gate
@@ -54,6 +55,7 @@ class DeskInputs:
     watching_no_price: int = 0
     watching_below_min: int = 0
     watching_below_threshold: int = 0
+    pinned: list[dict] = field(default_factory=list)
     paper_trades: list[dict] = field(default_factory=list)
     paper_marks: dict[str, dict] = field(default_factory=dict)
     balance_wei: Optional[int] = None
@@ -121,9 +123,10 @@ def build_desk_payload(inp: DeskInputs, now: datetime) -> dict:
             "usd": None,  # no onchain EPC/USD source yet
             "burn_address": _addr(burn) if burn else None,
         },
+        # Scored candidates first (capped), then the pinned tokens at the bottom
         "watching": watching_rows(inp.watching_tokens, settings.DESK_ENTRY_THRESHOLD,
                                   settings.desk_excluded_tokens, settings.DESK_WATCHING_LIMIT,
-                                  take_profit_mc_usd=settings.DESK_TP_MC_USD),
+                                  take_profit_mc_usd=settings.DESK_TP_MC_USD) + pinned_watching_rows(inp.pinned),
         "watching_not_onchain": inp.watching_not_onchain,
         "watching_no_price": inp.watching_no_price,
         "watching_below_min": inp.watching_below_min,
@@ -260,6 +263,7 @@ async def load_desk_inputs(db: AsyncSession, with_chain: bool = True) -> DeskInp
         watching_below_min=int(hidden["below_min"] or 0),
         watching_below_threshold=int(below_threshold or 0),
     )
+    inp.pinned = await load_pinned_rows(db)
     if settings.DESK_PAPER_ENABLED:
         inp.paper_trades = await load_paper_trades(db)
         open_mints = [p["mint"] for p in inp.paper_trades if p["exit_at"] is None]

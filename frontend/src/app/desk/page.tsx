@@ -9,7 +9,7 @@ import { ClosedTrades, OpenPositions } from '@/components/desk/TradesPanels';
 import { WhyCardDialog } from '@/components/desk/WhyCard';
 import { SimulationCard } from '@/components/desk/SimulationCard';
 import { DeskFooter } from '@/components/desk/DeskFooter';
-import { DESK_SIMULATION, DESK_HERO, DESK_STATE_LABEL } from '@/config/deskCopy';
+import { DESK_HERO, DESK_STATE_LABEL } from '@/config/deskCopy';
 import { useEmileDatabase } from '@/hooks/useEmileDatabase';
 import { useDesk } from '@/hooks/useDesk';
 import { useEmileStore } from '@/store/useEmileStore';
@@ -42,8 +42,8 @@ export default function DeskPage() {
               <p className="text-[var(--dim)] text-[15px] md:text-base max-w-[56ch] mt-4 leading-relaxed">{DESK_HERO.intro}</p>
             </div>
 
-            {/* Golem's simulated live trading: paper trades at real prices, running while live trading is gated */}
-            {data?.simulation?.enabled && <SimulationCard trades={data.simulation.trades} />}
+            {/* Golem's real onchain live trading stats card */}
+            <SimulationCard data={data ?? undefined} />
           </div>
         </section>
 

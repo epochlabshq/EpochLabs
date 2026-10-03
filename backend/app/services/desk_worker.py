@@ -25,12 +25,14 @@ from app.api.websocket import manager
 from app.services.desk import group_trades
 from app.services.desk_executor import run_executor_cycle
 from app.services.desk_discovery import discover_tokens
+from app.services.desk_pinned import refresh_pinned
 from app.services.desk_paper import run_paper_cycle
 from app.services.desk_poster import initial_post_status, post_due
 from app.services import desk_chain
 from app.services.live_holders import refresh_live_holders
 from app.services.live_market import refresh_market
 from app.services.scorer import ScorerUnavailable, score_mints
+from app.services.desk_wallet_sync import sync_wallet_transfers
 
 DESK_WORKER_LOCK_KEY = 0x45504F43_4445534B  # "EPOC" "DESK"
 
@@ -121,6 +123,18 @@ async def run_desk_cycle() -> None:
             except Exception as e:
                 await db.rollback()
                 print(f"[DESK WORKER] Market refresh failed: {type(e).__name__} {e}", flush=True)
+            try:
+                await refresh_pinned(db)
+            except Exception as e:
+                await db.rollback()
+                print(f"[DESK WORKER] Pinned refresh failed: {type(e).__name__} {e}", flush=True)
+            try:
+                new_swaps = await sync_wallet_transfers(db)
+                if new_swaps > 0:
+                    print(f"[DESK WORKER] Synced {new_swaps} new wallet transfers from onchain", flush=True)
+            except Exception as e:
+                await db.rollback()
+                print(f"[DESK WORKER] Wallet sync failed: {type(e).__name__} {e}", flush=True)
             try:
                 n = await score_watching(db)
                 # A scoring pass over the feed is a decision cycle: that is what the heartbeat reports

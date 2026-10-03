@@ -8,8 +8,8 @@ import { fmtAmount, fmtDuration, fmtEth, fmtSignedEth, fmtSignedPct, pnlTone, ty
 // One clip exists (Golem typing at the keyboard). It plays while Golem is in a position; in every other state
 // the frame holds still and the treatment changes, until dedicated pose illustrations exist.
 const GOLEM_TREATMENT: Record<DeskState, string> = {
-  gated: 'grayscale opacity-45',
-  watching: 'opacity-85',
+  gated: 'opacity-100 ring-2 ring-[var(--live)]/70',
+  watching: 'opacity-100 ring-2 ring-[var(--banana)]/70',
   waiting: 'opacity-95 ring-2 ring-[var(--banana)]/70',
   entering: 'opacity-100 ring-2 ring-[var(--banana)] desk-ring',
   in_position: 'opacity-100 ring-2 ring-[var(--live)]/70',
@@ -17,7 +17,7 @@ const GOLEM_TREATMENT: Record<DeskState, string> = {
 };
 
 const STATE_DOT: Record<DeskState, string> = {
-  gated: 'bg-[var(--faint)]',
+  gated: 'bg-[var(--live)]',
   watching: 'bg-[var(--banana)]',
   waiting: 'bg-[var(--banana)] epochs-pulse',
   entering: 'bg-[var(--banana)] epochs-pulse',
@@ -31,8 +31,7 @@ const GolemPose: React.FC<{ state: DeskState }> = ({ state }) => {
     const v = ref.current;
     if (!v) return;
     const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (state === 'in_position' && !reduce) v.play().catch(() => {});
-    else v.pause();
+    if (!reduce) v.play().catch(() => {});
   }, [state]);
   return (
     <div className="relative shrink-0">
@@ -46,9 +45,6 @@ const GolemPose: React.FC<{ state: DeskState }> = ({ state }) => {
         aria-hidden
         className={`w-10 h-10 sm:w-14 sm:h-14 md:w-16 md:h-16 rounded-xl object-cover border border-[var(--border-strong)] transition ${GOLEM_TREATMENT[state]}`}
       />
-      {state === 'gated' && (
-        <span aria-hidden className="absolute -top-1.5 -right-1 font-mono text-[11px] text-[var(--dim)] desk-zz">z</span>
-      )}
     </div>
   );
 };
@@ -82,7 +78,7 @@ export const StatusBar: React.FC<{ data: DeskPayload }> = ({ data }) => {
               </span>
             </div>
             <p className="hidden sm:block text-[13px] text-[var(--fg)] leading-snug mt-0.5">{DESK_STATE_COPY[data.state]}</p>
-            {blocker && (data.state === 'gated' || data.state === 'paused') && (
+            {blocker && data.state === 'paused' && (
               <p className="font-mono text-[11.5px] text-[var(--stall)] mt-0.5">
                 Blocked by: {blocker}
                 {BLOCKER_LABEL[blocker] && <span className="text-[var(--dim)]"> · {BLOCKER_LABEL[blocker]}</span>}

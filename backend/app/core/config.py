@@ -140,7 +140,7 @@ class Settings(BaseSettings):
     DESK_HEARTBEAT_WARN_SECONDS: int = int(os.getenv("DESK_HEARTBEAT_WARN_SECONDS", "300"))
     DESK_DROPPED_VISIBLE_H: int = int(os.getenv("DESK_DROPPED_VISIBLE_H", "6"))
     DESK_DROPPED_REVEAL_H: int = int(os.getenv("DESK_DROPPED_REVEAL_H", "48"))
-    DESK_WATCHING_LIMIT: int = int(os.getenv("DESK_WATCHING_LIMIT", "50"))
+    DESK_WATCHING_LIMIT: int = int(os.getenv("DESK_WATCHING_LIMIT", "10"))
     DESK_CLOSED_LIMIT: int = int(os.getenv("DESK_CLOSED_LIMIT", "50"))
     # Tokens Golem must never buy: EPC, the team's other tokens, plus a comma-separated env list
     DESK_EXCLUDED_TOKENS_EXTRA: str = os.getenv("DESK_EXCLUDED_TOKENS", "")
@@ -153,7 +153,7 @@ class Settings(BaseSettings):
     DESK_PUBLIC_URL: str = os.getenv("DESK_PUBLIC_URL", "https://epochlabs.run/desk")
     # Executor: "off" (default), "dry_run" (evaluate and log only, writes nothing) or "live" (needs a signer)
     # SIMULATION: log hypothetical buys/sells at real prices, independent of the trade gate. No funds involved.
-    DESK_PAPER_ENABLED: bool = os.getenv("DESK_PAPER_ENABLED", "true").lower() in ("true", "1", "yes")
+    DESK_PAPER_ENABLED: bool = os.getenv("DESK_PAPER_ENABLED", "false").lower() in ("true", "1", "yes")
     DESK_EXECUTOR_MODE: str = os.getenv("DESK_EXECUTOR_MODE", "off").lower()
     DESK_MAX_WALLET_FRACTION: float = float(os.getenv("DESK_MAX_WALLET_FRACTION", "0.2"))
     DESK_GAS_RESERVE_ETH: float = float(os.getenv("DESK_GAS_RESERVE_ETH", "0.005"))

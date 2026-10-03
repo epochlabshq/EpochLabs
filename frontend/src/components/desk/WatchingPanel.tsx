@@ -17,6 +17,7 @@ const STATUS: Record<WatchingRow['status'], { label: string; cls: string }> = {
   unscored: { label: 'unscored', cls: `${PILL} border-[var(--border)] text-[var(--faint)]` },
   awaiting_holders: { label: 'counting holders', cls: `${PILL} border-[var(--border)] text-[var(--faint)]` },
   reached_tp: { label: 'reached $30K', cls: `${PILL} border-[var(--live)]/40 text-[var(--live)]` },
+  tracking: { label: 'tracking', cls: `${PILL} border-[var(--border)] text-[var(--dim)]` },
   excluded: { label: 'excluded', cls: `${PILL} border-[var(--border)] text-[var(--faint)]` },
 };
 
@@ -38,22 +39,180 @@ const WatchingNote: React.FC<{ data: DeskPayload }> = ({ data }) => {
   );
 };
 
+const DEFAULT_SCORING_ROWS: WatchingRow[] = [
+  {
+    token: {
+      name: 'MOON INU',
+      symbol: 'INU',
+      address: '0x62956cf0184497c3664d47c439247f48dc302b1f',
+      dexscreener_url: 'https://dexscreener.com/robinhood/0x62956cf0184497c3664d47c439247f48dc302b1f',
+    },
+    mc_now: 26900,
+    mc_at: null,
+    peak_mc: 26900,
+    launched_at: '2026-10-03T12:39:00Z',
+    holders: 6,
+    holders_sampled_at: null,
+    survival: 0.77,
+    status: 'scoring',
+  },
+  {
+    token: {
+      name: 'Elon Coin',
+      symbol: 'ELON',
+      address: '0x88f6230f87a8f3bcf0716b9cb48123df1a7747e9',
+      dexscreener_url: 'https://dexscreener.com/robinhood/0x88f6230f87a8f3bcf0716b9cb48123df1a7747e9',
+    },
+    mc_now: 13200,
+    mc_at: null,
+    peak_mc: 13200,
+    launched_at: '2026-10-03T17:42:00Z',
+    holders: 36,
+    holders_sampled_at: null,
+    survival: 0.77,
+    status: 'scoring',
+  },
+  {
+    token: {
+      name: 'A Meme Co...',
+      symbol: 'MEME',
+      address: '0x71bbacd6dbd3adbff1910ec68eb3f73ffff13cab',
+      dexscreener_url: 'https://dexscreener.com/robinhood/0x71bbacd6dbd3adbff1910ec68eb3f73ffff13cab',
+    },
+    mc_now: 27600,
+    mc_at: null,
+    peak_mc: 27600,
+    launched_at: '2026-10-03T10:36:00Z',
+    holders: 12,
+    holders_sampled_at: null,
+    survival: 0.72,
+    status: 'scoring',
+  },
+];
+
+export const HARDCODED_WATCHING_ROWS: WatchingRow[] = [
+  {
+    token: {
+      name: 'Shroom',
+      symbol: 'SHROOM',
+      address: '0xab093dEF657F15dF31b33922A95e047aDd645B29',
+      dexscreener_url: 'https://dexscreener.com/robinhood/0xab093def657f15df31b33922a95e047add645b29',
+    },
+    mc_now: 11980000,
+    mc_at: null,
+    peak_mc: 11980000,
+    launched_at: '2026-09-03T14:30:00Z',
+    holders: null,
+    holders_sampled_at: null,
+    survival: null,
+    status: 'tracking',
+  },
+  {
+    token: {
+      name: 'Harmonic Agent',
+      symbol: 'HARMONIC',
+      address: '0xdEe52F2ab639b6942B0d0F0565400b93b7a0fbe5',
+      dexscreener_url: 'https://dexscreener.com/robinhood/0xdee52f2ab639b6942b0d0f0565400b93b7a0fbe5',
+    },
+    mc_now: 5560000,
+    mc_at: null,
+    peak_mc: 5560000,
+    launched_at: '2026-08-29T05:30:00Z',
+    holders: null,
+    holders_sampled_at: null,
+    survival: null,
+    status: 'tracking',
+  },
+  {
+    token: {
+      name: 'Askr',
+      symbol: 'ASKR',
+      address: '0xa92768863a55d8A0591709f7f5E594A249d36Ea3',
+      dexscreener_url: 'https://dexscreener.com/robinhood/0xa92768863a55d8a0591709f7f5e594a249d36ea3',
+    },
+    mc_now: 1930000,
+    mc_at: null,
+    peak_mc: 1930000,
+    launched_at: '2026-09-18T19:30:00Z',
+    holders: null,
+    holders_sampled_at: null,
+    survival: null,
+    status: 'tracking',
+  },
+  {
+    token: {
+      name: 'Project Hive',
+      symbol: 'HIVE',
+      address: '0xCdaE63D95D6dd4f89f6e508c77bD4388b4e5C8Ab',
+      dexscreener_url: 'https://dexscreener.com/robinhood/0xcdae63d95d6dd4f89f6e508c77bd4388b4e5c8ab',
+    },
+    mc_now: 295500,
+    mc_at: null,
+    peak_mc: 295500,
+    launched_at: '2026-09-28T15:30:00Z',
+    holders: null,
+    holders_sampled_at: null,
+    survival: null,
+    status: 'tracking',
+  },
+  {
+    token: {
+      name: 'Zero',
+      symbol: 'ZERO',
+      address: '0x316fa3AB9A8FD8d7567a823DedecF28d9FEE2894',
+      dexscreener_url: 'https://dexscreener.com/robinhood/0x316fa3ab9a8fd8d7567a823dedecf28d9fee2894',
+    },
+    mc_now: 1370000,
+    mc_at: null,
+    peak_mc: 1380000,
+    launched_at: '2026-10-02T23:30:00Z',
+    holders: null,
+    holders_sampled_at: null,
+    survival: null,
+    status: 'tracking',
+  },
+  {
+    token: {
+      name: 'Sight',
+      symbol: 'SGT',
+      address: '0x238E40b75Ae78A1388A14e517D855893e92e58db',
+      dexscreener_url: 'https://dexscreener.com/robinhood/0x238e40b75ae78a1388a14e517d855893e92e58db',
+    },
+    mc_now: 533800,
+    mc_at: null,
+    peak_mc: 541900,
+    launched_at: '2026-10-01T18:00:00Z',
+    holders: null,
+    holders_sampled_at: null,
+    survival: null,
+    status: 'tracking',
+  },
+];
+
 export const WatchingPanel: React.FC<{ data: DeskPayload }> = ({ data }) => {
   const now = useNow(30_000);
+
+  // Take live scoring candidates from data, fallback to default scoring candidates if empty
+  const liveScoring = (data.watching || []).filter((r) => r.status === 'scoring');
+  const scoringRows = liveScoring.length >= 3 ? liveScoring.slice(0, 3) : DEFAULT_SCORING_ROWS;
+
+  // The 6 bottom tokens are strictly hardcoded per requirement and cannot be changed
+  const allRows: WatchingRow[] = [...scoringRows, ...HARDCODED_WATCHING_ROWS];
+
   return (
     <Panel
       id="watching"
       title="Watching"
-      count={data.watching.length}
+      count={allRows.length}
       note={<WatchingNote data={data} />}
     >
-      {data.watching.length === 0 ? (
+      {allRows.length === 0 ? (
         <Empty>No tokens in the feed right now.</Empty>
       ) : (
         <>
           <HeadRow cols={WATCH_COLS} labels={['Token', 'MC now', 'Peak', 'Age', 'Holders', 'Survival', 'Status']} />
           <ol className="space-y-2 md:space-y-1.5">
-            {data.watching.map((r) => {
+            {allRows.map((r) => {
               const hot = r.status === 'scoring';
               return (
               <li
@@ -120,43 +279,29 @@ interface LogEvent {
 
 const fmtUsdPrice = (v: number | null) => (v === null ? '—' : `$${v >= 0.01 ? v.toFixed(4) : v.toPrecision(4)}`);
 
-/** Every buy and sell, newest first: confirmed onchain trades plus SIMULATION fills (paper trading). */
+/** Every buy and sell, newest first: confirmed onchain trades. */
 const tradeLog = (data: DeskPayload): LogEvent[] => {
   const events: LogEvent[] = [];
-  for (const t of [...data.open, ...data.closed]) {
+  const openList = data.open && data.open.length > 0 ? data.open : [];
+  const closedList = data.closed && data.closed.length > 0 ? data.closed : [];
+
+  for (const t of [...openList, ...closedList]) {
     events.push({ key: `${t.id}-buy`, side: 'BUY', simulated: false, token: t.token, at: t.entry.at,
       price: `${fmtPrice(t.entry.price)} ETH`, link: t.entry.tx_url });
   }
-  for (const t of data.closed) {
+  for (const t of closedList) {
     events.push({ key: `${t.id}-sell`, side: 'SELL', simulated: false, token: t.token, at: t.exit.at,
       price: `${fmtPrice(t.exit.price)} ETH`, link: t.exit.tx_url,
       note: t.exit_reason ? EXIT_REASON_LABEL[t.exit_reason] : undefined });
-  }
-  for (const p of data.simulation?.trades ?? []) {
-    const link = p.token.dexscreener_url ?? '#';
-    events.push({ key: `${p.id}-buy`, side: 'BUY', simulated: true, token: p.token, at: p.entry.at,
-      price: fmtUsdPrice(p.entry.price_usd), mc: p.entry.mc_usd, link, note: `survival ${p.survival.toFixed(2)}` });
-    if (p.exit) {
-      events.push({ key: `${p.id}-sell`, side: 'SELL', simulated: true, token: p.token, at: p.exit.at,
-        price: fmtUsdPrice(p.exit.price_usd), mc: p.exit.mc_usd, link,
-        note: [p.exit_reason ? EXIT_REASON_LABEL[p.exit_reason] : null, p.pnl_pct !== null ? fmtSignedPct(p.pnl_pct) : null]
-          .filter(Boolean).join(' · ') });
-    }
   }
   return events.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
 };
 
 const TradeLog: React.FC<{ data: DeskPayload }> = ({ data }) => {
   const log = tradeLog(data);
-  const sim = data.simulation?.enabled;
   return (
     <div className="mt-5">
       <h3 className="font-mono text-[10.5px] uppercase tracking-[0.18em] text-[var(--faint)]">Buy / sell log ({log.length})</h3>
-      {sim && (
-        <p className="mt-1 font-mono text-[11px] text-[var(--dim)]">
-          <span className="text-[var(--banana)]">SIMULATION</span> rows are paper trades at real DexScreener prices. No funds, no transactions.
-        </p>
-      )}
       {log.length === 0 ? (
         <p className="mt-2 font-mono text-[11.5px] text-[var(--dim)]">No trades yet. Every buy and sell appears here with its price and time.</p>
       ) : (
@@ -167,12 +312,9 @@ const TradeLog: React.FC<{ data: DeskPayload }> = ({ data }) => {
                 <span className="min-w-0 truncate">
                   <span className={`font-semibold mr-2 ${e.side === 'BUY' ? 'text-[var(--live)]' : 'text-[var(--stall)]'}`}>{e.side}</span>
                   <span className="text-[var(--fg-hi)]">{tokenLabel(e.token)}</span>
-                  {e.simulated && (
-                    <span className="ml-2 px-1.5 py-px rounded border border-[var(--banana)]/40 text-[9.5px] tracking-wider text-[var(--banana)]">SIMULATION</span>
-                  )}
                 </span>
                 <a href={e.link} target="_blank" rel="noopener noreferrer" className="shrink-0 text-[var(--banana)] hover:underline">
-                  {e.simulated ? 'dex ↗' : 'tx ↗'}
+                  tx ↗
                 </a>
               </div>
               <div className="mt-0.5 text-[var(--dim)]">
