@@ -6,7 +6,10 @@ from sqlalchemy import text
 
 from app.core.config import settings
 from app.db.database import AsyncSessionLocal
+from app.db.locks import exclusive
 from app.db.models import ModelRun
+from app.db.model_artifacts_schema import ensure_model_artifacts_schema
+from app.ml.artifact import serialize_artifact
 from app.api.endpoints import get_latest_model, serialize_model_run, invalidate_state_cache
 from app.api.websocket import manager
 
@@ -17,15 +20,16 @@ MODEL_WORKER_NOTE_PREFIX = "model_worker"
 MODEL_WORKER_LOCK_KEY = 0x45504F43_4D4F444C  # "EPOC" "MODL"
 
 
-def needs_retrain(latest: ModelRun | None, n_samples: int, n_positive: int) -> bool:
+def needs_retrain(latest: ModelRun | None, n_samples: int, n_positive: int, has_artifact: bool = True) -> bool:
     """
     Retrain only when something the published numbers depend on has changed:
     no run yet, the labeled set moved, or the run was produced with a different capacity d
-    (i.e. by an older formula).
+    (i.e. by an older formula). Also when the latest run has no stored artifact, since live scoring
+    must use the model behind the published run.
     """
     if latest is None:
         return True
-    if latest.capacity_d != settings.CAPACITY_D:
+    if latest.capacity_d != settings.CAPACITY_D or not has_artifact:
         return True
     return latest.n_samples != n_samples or latest.n_positive != n_positive
 
@@ -49,20 +53,21 @@ async def run_model_cycle(force: bool = False) -> dict | None:
     """Train on the current labeled set, persist a ModelRun and broadcast it. Returns the new run's payload, if any."""
     from app.ml.trainer import train_model_and_evaluate
 
-    async with AsyncSessionLocal() as db:
-        locked = (await db.execute(
-            text("SELECT pg_try_advisory_lock(:k)"), {"k": MODEL_WORKER_LOCK_KEY}
-        )).scalar()
+    async with exclusive(MODEL_WORKER_LOCK_KEY) as locked, AsyncSessionLocal() as db:
         if not locked:
             print("[MODEL WORKER] Another instance holds the training lock. Skipping.")
             return None
         try:
+            await ensure_model_artifacts_schema(db)
             counts = (await db.execute(text(
                 "SELECT COUNT(*) FILTER (WHERE status::text IN ('passed','stalled')) AS n, "
                 "COUNT(*) FILTER (WHERE status::text = 'passed') AS pos FROM tokens;"
             ))).mappings().one()
             latest = await get_latest_model(db)
-            if not force and not needs_retrain(latest, counts["n"], counts["pos"]):
+            has_artifact = latest is not None and (await db.execute(
+                text("SELECT 1 FROM model_artifacts WHERE run_id = :id"), {"id": latest.id}
+            )).first() is not None
+            if not force and not needs_retrain(latest, counts["n"], counts["pos"], has_artifact):
                 return None
 
             df = await _load_labeled_frame(db)
@@ -90,14 +95,17 @@ async def run_model_cycle(force: bool = False) -> dict | None:
                 notes=f"{MODEL_WORKER_NOTE_PREFIX} · time_split_gap={result.get('time_split_gap')}",
             )
             db.add(run)
+            await db.flush()  # assigns run.id; run and artifact commit together
+            raw, digest = serialize_artifact(result["artifact"])
+            await db.execute(text(
+                "INSERT INTO model_artifacts (run_id, sha256, artifact) VALUES (:id, :sha, :raw)"
+            ), {"id": run.id, "sha": digest, "raw": raw})
             await db.commit()
             await db.refresh(run)
             # Serialize while attached; the rollback below expires ORM state
             payload = serialize_model_run(run)
         finally:
-            # Clear any failed transaction so the unlock can run; session-level locks survive rollback
             await db.rollback()
-            await db.execute(text("SELECT pg_advisory_unlock(:k)"), {"k": MODEL_WORKER_LOCK_KEY})
 
     invalidate_state_cache()
     from app.api.epochs_endpoints import invalidate_epochs_cache
@@ -105,7 +113,8 @@ async def run_model_cycle(force: bool = False) -> dict | None:
     await manager.broadcast({"model": payload})
     print(
         f"[MODEL WORKER] Saved run {payload['run_id']}: n={payload['n']} auc={payload['auc']} "
-        f"floor={payload['proven_floor']} jar={payload['jar_level']} blocked_by={payload['blocked_by']}"
+        f"floor={payload['proven_floor']} jar={payload['jar_level']} blocked_by={payload['blocked_by']} "
+        f"artifact_sha256={digest}"
     )
     return payload
 

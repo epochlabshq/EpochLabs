@@ -14,6 +14,7 @@ from sqlalchemy import text
 from app.core.config import settings
 from app.db.database import AsyncSessionLocal
 from app.db.epochs_schema import ensure_epochs_schema
+from app.db.locks import exclusive
 from app.api.endpoints import methodology_snapshot
 from app.api.epochs_endpoints import load_completed, invalidate_epochs_cache
 from app.api.websocket import manager
@@ -165,8 +166,7 @@ async def record_completion(db, epoch_id: int, completed: dict[int, Completion],
 async def run_watcher_cycle(reader: Optional[ChainReader]) -> list[int]:
     """One tick. Returns the ids of epochs completed during it."""
     newly_completed: list[int] = []
-    async with AsyncSessionLocal() as db:
-        locked = (await db.execute(text("SELECT pg_try_advisory_lock(:k)"), {"k": WATCHER_LOCK_KEY})).scalar()
+    async with exclusive(WATCHER_LOCK_KEY) as locked, AsyncSessionLocal() as db:
         if not locked:
             return []
         try:
@@ -190,7 +190,6 @@ async def run_watcher_cycle(reader: Optional[ChainReader]) -> list[int]:
                 print(f"[EPOCH WATCHER] Epoch {active} complete: {completion.proof}", flush=True)
         finally:
             await db.rollback()
-            await db.execute(text("SELECT pg_advisory_unlock(:k)"), {"k": WATCHER_LOCK_KEY})
 
     if newly_completed:
         invalidate_epochs_cache()

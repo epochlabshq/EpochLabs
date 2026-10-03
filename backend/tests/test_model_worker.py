@@ -26,6 +26,9 @@ class TestNeedsRetrain(unittest.TestCase):
     def test_run_from_older_formula(self):
         self.assertTrue(needs_retrain(_run(d=28), 1500, 400))
 
+    def test_run_without_artifact(self):
+        self.assertTrue(needs_retrain(_run(), 1500, 400, has_artifact=False))
+
 
 if __name__ == "__main__":
     unittest.main()

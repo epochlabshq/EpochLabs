@@ -199,3 +199,94 @@ CREATE TABLE IF NOT EXISTS launcher_events (
     new_agent  TEXT,
     PRIMARY KEY (tx_hash, log_index)
 );
+
+-- Model artifacts (app/db/model_artifacts_schema.py): the exact model behind each run, for live scoring
+CREATE TABLE IF NOT EXISTS model_artifacts (
+    run_id      BIGINT PRIMARY KEY REFERENCES model_runs(id) ON DELETE CASCADE,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    sha256      TEXT NOT NULL,                        -- sha256 of the canonical JSON in `artifact`
+    artifact    TEXT NOT NULL                         -- {format, feature_names, embedder, pca, booster}
+);
+
+CREATE OR REPLACE FUNCTION model_artifacts_guard() RETURNS TRIGGER AS $$
+BEGIN
+    RAISE EXCEPTION 'model_artifacts rows are immutable';
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS model_artifacts_immutable ON model_artifacts;
+
+CREATE TRIGGER model_artifacts_immutable BEFORE UPDATE ON model_artifacts
+FOR EACH ROW EXECUTE FUNCTION model_artifacts_guard();
+
+-- The Desk (app/db/desk_schema.py)
+
+CREATE TABLE IF NOT EXISTS desk_scores (
+    mint         TEXT PRIMARY KEY,
+    run_id       BIGINT NOT NULL REFERENCES model_runs(id) ON DELETE CASCADE,
+    survival     DOUBLE PRECISION NOT NULL CHECK (survival BETWEEN 0 AND 1),
+    top_signals  JSONB NOT NULL,
+    scored_at    TIMESTAMPTZ NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS desk_candidates (
+    id              BIGSERIAL PRIMARY KEY,
+    token           TEXT NOT NULL,
+    queued_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+    survival        DOUBLE PRECISION NOT NULL CHECK (survival BETWEEN 0 AND 1),
+    stage           TEXT NOT NULL DEFAULT 'liquidity_check'
+                    CHECK (stage IN ('liquidity_check', 'sizing', 'entering', 'open', 'dropped')),
+    dropped_reason  TEXT,
+    dropped_at      TIMESTAMPTZ,
+    decision_id     BIGINT REFERENCES golem_trade_decisions(id),
+    CHECK (stage <> 'dropped' OR (dropped_reason IS NOT NULL AND dropped_at IS NOT NULL))
+);
+
+CREATE TABLE IF NOT EXISTS desk_state (
+    id                INT PRIMARY KEY CHECK (id = 1),
+    state             TEXT NOT NULL,
+    changed_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+    last_decision_at  TIMESTAMPTZ
+);
+
+INSERT INTO desk_state (id, state) VALUES (1, 'gated') ON CONFLICT (id) DO NOTHING;
+
+CREATE TABLE IF NOT EXISTS desk_announcements (
+    trade_id      TEXT NOT NULL,
+    kind          TEXT NOT NULL CHECK (kind IN ('open', 'close')),
+    tx_hash       TEXT NOT NULL,
+    announced_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (trade_id, kind)
+);
+
+ALTER TABLE golem_trade_decisions ADD COLUMN IF NOT EXISTS why_canonical TEXT;
+
+ALTER TABLE golem_trade_decisions ADD COLUMN IF NOT EXISTS why_sha256 TEXT;
+
+ALTER TABLE golem_trade_decisions ADD COLUMN IF NOT EXISTS exit_reason TEXT
+    CHECK (exit_reason IN ('take_profit', 'stop_loss', 'max_hold'));
+
+CREATE OR REPLACE FUNCTION golem_trade_decisions_guard() RETURNS TRIGGER AS $$
+BEGIN
+    IF TG_OP = 'DELETE' THEN
+        RAISE EXCEPTION 'golem_trade_decisions rows cannot be deleted';
+    END IF;
+    IF OLD.tx_hash IS NOT NULL AND NEW.tx_hash IS DISTINCT FROM OLD.tx_hash THEN
+        RAISE EXCEPTION 'tx_hash is already set';
+    END IF;
+    IF (NEW.decided_at, NEW.token, NEW.side, NEW.survival_probability, NEW.top_signal, NEW.run_id)
+           IS DISTINCT FROM
+       (OLD.decided_at, OLD.token, OLD.side, OLD.survival_probability, OLD.top_signal, OLD.run_id)
+       OR NEW.why_canonical IS DISTINCT FROM OLD.why_canonical
+       OR NEW.why_sha256 IS DISTINCT FROM OLD.why_sha256
+       OR NEW.exit_reason IS DISTINCT FROM OLD.exit_reason THEN
+        RAISE EXCEPTION 'golem_trade_decisions rows are append-only';
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS golem_trade_decisions_append_only ON golem_trade_decisions;
+
+CREATE TRIGGER golem_trade_decisions_append_only BEFORE UPDATE OR DELETE ON golem_trade_decisions
+FOR EACH ROW EXECUTE FUNCTION golem_trade_decisions_guard();

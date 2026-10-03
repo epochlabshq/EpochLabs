@@ -1,46 +1,24 @@
-import httpx
 from datetime import datetime, timezone
+from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, text
 from app.db.models import Token, TokenStatus
 from app.core.config import settings
 
-async def sample_token_holders_rpc(mint: str) -> int:
+async def sample_token_holders(mint: str, launched_at: datetime) -> Optional[int]:
     """
-    Samples holder count (number of token accounts with non-zero balance) via Helius DAS API / RPC.
-    Sampled EXACTLY ONCE at labeling time (48 hours after launch).
+    Holder count at launch + 48h, counted onchain (app.services.live_holders). Sampled EXACTLY ONCE, at labeling.
+    None when the chain cannot be read: never a made-up number. (This used to call Helius, a Solana API, with
+    Robinhood Chain addresses and fell back to a random count, so earlier samples in the table are not real.)
     """
-    api_key = settings.CLEAN_HELIUS_API_KEY
-    if not api_key:
-        # Simulated holder count for testing / local execution
-        import random
-        return int(40 + random.random() ** 2.4 * 2600)
+    from datetime import timedelta
+    from app.services import desk_chain
+    from app.services.live_holders import count_holders
 
-    url = f"https://mainnet.helius-rpc.com/?api-key={api_key}"
-    payload = {
-        "jsonrpc": "2.0",
-        "id": "emile-holders",
-        "method": "getTokenAccounts",
-        "params": {
-            "mint": mint,
-            "page": 1,
-            "limit": 1000
-        }
-    }
-    
-    try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            res = await client.post(url, json=payload)
-            if res.status_code == 200:
-                data = res.json()
-                accounts = data.get("result", {}).get("token_accounts", [])
-                non_zero = sum(1 for acc in accounts if float(acc.get("amount", 0)) > 0)
-                return non_zero
-    except Exception:
-        pass
+    res = await count_holders(await desk_chain.log_reader(), mint, launched_at,
+                              at=launched_at + timedelta(hours=48), transfers_r=await desk_chain.transfers_reader())
+    return res[0] if res else None
 
-    import random
-    return int(40 + random.random() ** 2.4 * 2600)
 
 async def run_label_worker_cycle(db: AsyncSession) -> dict:
     """
@@ -66,9 +44,9 @@ async def run_label_worker_cycle(db: AsyncSession) -> dict:
 
     for token in pending_tokens:
         # 1. Sample holders ONCE at 48h mark
-        holders_count = await sample_token_holders_rpc(token.mint)
+        holders_count = await sample_token_holders(token.mint, token.launched_at)
         token.holders = holders_count
-        token.holders_sampled_at = now
+        token.holders_sampled_at = now if holders_count is not None else None
         token.labeled_at = now
 
         # 2. Assign label based on $30K peak market cap rule

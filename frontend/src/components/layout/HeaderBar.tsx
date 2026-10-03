@@ -16,14 +16,15 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({ phaseText = 'phase 1 · le
     { name: 'Brain', href: '/brain' },
     { name: 'The Math', href: '/math' },
     { name: 'Epochs', href: '/epochs' },
+    { name: 'Desk', href: '/desk' },
     // Launches is hidden from the nav for now; the /launches route still works.
     { name: 'About', href: '/about' },
   ];
 
   return (
-    <header className="top glass-panel grid grid-cols-1 lg:grid-cols-[1fr_auto_auto] items-center p-4 px-5 md:px-7 border-b border-[var(--rule)] gap-4 relative z-20">
+    <header className="top glass-panel grid grid-cols-[minmax(0,1fr)_auto] xl:grid-cols-[minmax(0,1fr)_auto_auto] items-center p-4 px-5 md:px-7 border-b border-[var(--rule)] gap-4 relative z-20">
       {/* Left Column: Wordmark Box & Subtitle */}
-      <div className="min-w-0 flex flex-col md:flex-row items-start md:items-center gap-4">
+      <div className="order-1 min-w-0 flex flex-col md:flex-row items-start md:items-center gap-4">
         <Link 
           href="/" 
           className="wordmark inline-flex items-center gap-3.5 p-2 px-3.5 md:p-2.5 md:px-4 bg-[var(--panel2)] rounded-2xl transition-all duration-200 group shrink-0"
@@ -48,7 +49,7 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({ phaseText = 'phase 1 · le
       </div>
 
       {/* Center Navigation Tabs */}
-      <nav className="flex flex-wrap items-center gap-1 p-1 bg-[var(--panel2)] border border-[var(--soft)] rounded-lg text-xs font-mono min-w-0 lg:shrink-0 justify-center">
+      <nav className="order-3 xl:order-2 col-span-full xl:col-span-1 flex flex-wrap items-center gap-1 p-1 bg-[var(--panel2)] border border-[var(--soft)] rounded-lg text-xs font-mono min-w-0 xl:shrink-0 justify-center">
         {navLinks.map((link) => {
           const isActive = pathname === link.href;
           const isLaunches = link.name === 'Launches';
@@ -82,7 +83,7 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({ phaseText = 'phase 1 · le
       </nav>
 
       {/* Right Column: X Link & $EPC Badge */}
-      <div className="topright flex items-center justify-end gap-3 shrink-0">
+      <div className="topright order-2 xl:order-3 self-start xl:self-center flex items-center justify-end gap-3 shrink-0">
         <a
           href="https://x.com/EpochLabsHQ"
           target="_blank"
@@ -94,10 +95,13 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({ phaseText = 'phase 1 · le
             <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
           </svg>
         </a>
-        <div className="text-right shrink-0 min-w-[90px] hidden sm:block">
-          <div className="sym text-[var(--banana)] font-sans font-semibold text-base leading-none">$EPC</div>
-          <div className="phase text-[var(--faint)] text-[10.5px] mt-1 font-mono uppercase tracking-wider leading-none">{phaseText}</div>
-        </div>
+      </div>
+
+      {/* Page info: its own row under the nav on every page, so the nav row never has to make room for it */}
+      <div className="order-4 col-span-full flex items-center justify-end gap-2.5 -mt-1 pt-3 border-t border-[var(--soft)] min-w-0">
+        <span className="sym text-[var(--banana)] font-sans font-semibold text-sm leading-none">$EPC</span>
+        <span aria-hidden className="w-1 h-1 rounded-full bg-[var(--faint)]" />
+        <span className="phase text-[var(--faint)] text-[10.5px] font-mono uppercase tracking-wider leading-none truncate">{phaseText}</span>
       </div>
     </header>
   );

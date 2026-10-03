@@ -11,6 +11,7 @@ from app.api.websocket import router as ws_router
 from app.api.twitter_endpoints import router as twitter_router
 from app.api.epochs_endpoints import router as epochs_router
 from app.api.trades_endpoints import router as trades_router
+from app.api.desk_endpoints import router as desk_router
 
 from contextlib import asynccontextmanager
 
@@ -32,6 +33,11 @@ async def lifespan(app: FastAPI):
         asyncio.create_task(start_epoch_watcher_loop())
     except Exception as e:
         print(f"[MAIN] Warning: Failed to start epoch watcher loop: {e}")
+    try:
+        from app.services.desk_worker import start_desk_worker_loop
+        asyncio.create_task(start_desk_worker_loop())
+    except Exception as e:
+        print(f"[MAIN] Warning: Failed to start desk worker loop: {e}")
     try:
         from app.services.twitter_service import start_twitter_scheduler_loop
         asyncio.create_task(start_twitter_scheduler_loop())
@@ -70,6 +76,7 @@ app.include_router(ws_router)
 app.include_router(twitter_router)
 app.include_router(epochs_router)
 app.include_router(trades_router)
+app.include_router(desk_router)
 
 @app.get("/")
 async def root():

@@ -84,6 +84,10 @@ class Settings(BaseSettings):
 
     # Model worker: retrain when the labeled set changes, checked every N seconds
     MODEL_WORKER_INTERVAL_SECONDS: int = int(os.getenv("MODEL_WORKER_INTERVAL_SECONDS", "3600"))
+    # Only one deployment should run the writers below against a database. A local backend that shares the
+    # production database should turn off what production already runs (see backend/.env.example).
+    INGEST_WORKER_ENABLED: bool = os.getenv("INGEST_WORKER_ENABLED", "true").lower() in ("true", "1", "yes")
+    TWITTER_SCHEDULER_ENABLED: bool = os.getenv("TWITTER_SCHEDULER_ENABLED", "true").lower() in ("true", "1", "yes")
     MODEL_WORKER_ENABLED: bool = os.getenv("MODEL_WORKER_ENABLED", "true").lower() in ("true", "1", "yes")
 
     # Target Token Contract Addresses (CAs) & Axiom URLs
@@ -97,6 +101,9 @@ class Settings(BaseSettings):
     # Robinhood Chain (Epochs page). Addresses from contracts/deployments/robinhood.json.
     CHAIN_ID: int = 4663
     CHAIN_RPC_URL: str = os.getenv("CHAIN_RPC_URL", "https://rpc.mainnet.chain.robinhood.com")
+    # Alchemy for Robinhood Chain: point reads (balances, eth_call) and asset transfers. Its free tier caps
+    # eth_getLogs at 10 blocks, so log scans (indexers, holder counts) stay on CHAIN_RPC_URL.
+    RH_MAINNET_RPC_URL: str = os.getenv("RH_MAINNET_RPC_URL", "")
     BLOCKSCOUT_BASE: str = os.getenv("BLOCKSCOUT_BASE", "https://robinhoodchain.blockscout.com")
     EPOCH_LAUNCHER: str = os.getenv("EPOCH_LAUNCHER", "0x75fd64Cc8D57c529f34089Ac9083E704c23F0D8B")
     EPOCH_TOKEN_TEMPLATE: str = os.getenv("EPOCH_TOKEN_TEMPLATE", "0x96508719c110a341708546de78051e020f51D264")
@@ -118,6 +125,50 @@ class Settings(BaseSettings):
     EPOCH_MAX_CHUNKS_PER_TICK: int = int(os.getenv("EPOCH_MAX_CHUNKS_PER_TICK", "40"))
     EPOCH_WATCHER_INTERVAL_SECONDS: int = int(os.getenv("EPOCH_WATCHER_INTERVAL_SECONDS", "60"))
     EPOCH_WATCHER_ENABLED: bool = os.getenv("EPOCH_WATCHER_ENABLED", "true").lower() in ("true", "1", "yes")
+
+    UNISWAP_V2_FACTORY: str = os.getenv("UNISWAP_V2_FACTORY", "0x8bceaa40b9acdfaedf85adf4ff01f5ad6517937f")
+
+    # The Desk (live trading page). Trading values are defaults until the Open questions are decided.
+    DESK_ENTRY_THRESHOLD: float = float(os.getenv("DESK_ENTRY_THRESHOLD", "0.65"))
+    DESK_POSITION_SIZE_ETH: float = float(os.getenv("DESK_POSITION_SIZE_ETH", "0.05"))
+    DESK_MAX_OPEN: int = int(os.getenv("DESK_MAX_OPEN", "3"))
+    DESK_TP_MC_USD: float = float(os.getenv("DESK_TP_MC_USD", "30000"))
+    DESK_SL_MC_USD: float = float(os.getenv("DESK_SL_MC_USD", "5000"))
+    DESK_MAX_HOLD_H: int = int(os.getenv("DESK_MAX_HOLD_H", "48"))
+    DESK_MIN_LIQ_USD: float = float(os.getenv("DESK_MIN_LIQ_USD", "5000"))
+    DESK_START_ETH: float = float(os.getenv("DESK_START_ETH", "1.0"))
+    DESK_HEARTBEAT_WARN_SECONDS: int = int(os.getenv("DESK_HEARTBEAT_WARN_SECONDS", "300"))
+    DESK_DROPPED_VISIBLE_H: int = int(os.getenv("DESK_DROPPED_VISIBLE_H", "6"))
+    DESK_DROPPED_REVEAL_H: int = int(os.getenv("DESK_DROPPED_REVEAL_H", "48"))
+    DESK_WATCHING_LIMIT: int = int(os.getenv("DESK_WATCHING_LIMIT", "50"))
+    DESK_CLOSED_LIMIT: int = int(os.getenv("DESK_CLOSED_LIMIT", "50"))
+    # Tokens Golem must never buy: EPC, the team's other tokens, plus a comma-separated env list
+    DESK_EXCLUDED_TOKENS_EXTRA: str = os.getenv("DESK_EXCLUDED_TOKENS", "")
+    # X auto-post of entries/exits. Live sending also needs TWITTER_AUTO_POST_ENABLED; otherwise posts are dry runs.
+    DESK_X_POST_ENABLED: bool = os.getenv("DESK_X_POST_ENABLED", "false").lower() in ("true", "1", "yes")
+    DESK_X_POST_DELAY_SECONDS: int = int(os.getenv("DESK_X_POST_DELAY_SECONDS", "600"))
+    DESK_X_POST_MAX_ATTEMPTS: int = int(os.getenv("DESK_X_POST_MAX_ATTEMPTS", "3"))
+    # Trades older than this when first announced (history backfill) are never posted
+    DESK_X_POST_MAX_AGE_H: int = int(os.getenv("DESK_X_POST_MAX_AGE_H", "6"))
+    DESK_PUBLIC_URL: str = os.getenv("DESK_PUBLIC_URL", "https://epochlabs.run/desk")
+    # Executor: "off" (default), "dry_run" (evaluate and log only, writes nothing) or "live" (needs a signer)
+    DESK_EXECUTOR_MODE: str = os.getenv("DESK_EXECUTOR_MODE", "off").lower()
+    DESK_MAX_WALLET_FRACTION: float = float(os.getenv("DESK_MAX_WALLET_FRACTION", "0.2"))
+    DESK_GAS_RESERVE_ETH: float = float(os.getenv("DESK_GAS_RESERVE_ETH", "0.005"))
+    DESK_SLIPPAGE_BPS: int = int(os.getenv("DESK_SLIPPAGE_BPS", "500"))
+    DESK_TX_DEADLINE_SECONDS: int = int(os.getenv("DESK_TX_DEADLINE_SECONDS", "120"))
+    DESK_ENTERING_TIMEOUT_MINUTES: int = int(os.getenv("DESK_ENTERING_TIMEOUT_MINUTES", "10"))
+    # Watched tokens whose holder count is recounted onchain per Desk worker cycle (stalest first)
+    # Watching shows a token while its live market cap is at or above this (the feed's $10K entry bar)
+    DESK_WATCH_MIN_MC_USD: float = float(os.getenv("DESK_WATCH_MIN_MC_USD", "10000"))
+    DESK_HOLDERS_BATCH: int = int(os.getenv("DESK_HOLDERS_BATCH", "40"))
+    DESK_WORKER_INTERVAL_SECONDS: int = int(os.getenv("DESK_WORKER_INTERVAL_SECONDS", "60"))
+    DESK_WORKER_ENABLED: bool = os.getenv("DESK_WORKER_ENABLED", "true").lower() in ("true", "1", "yes")
+
+    @property
+    def desk_excluded_tokens(self) -> frozenset[str]:
+        extra = [a.strip() for a in self.DESK_EXCLUDED_TOKENS_EXTRA.split(",") if a.strip()]
+        return frozenset(a.lower() for a in [self.EPOCH_TOKEN_CA, self.EMILE_BANANA_TOKEN_CA, *extra])
 
     # Twitter / X API v2 Credentials & Auto-Post Settings
     TWITTER_API_KEY: str = os.getenv("TWITTER_API_KEY", "")

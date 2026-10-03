@@ -102,6 +102,11 @@ class ChainReader:
                 res = await self._client.send(req)
                 if res.status_code == 429 or res.status_code >= 500:
                     raise httpx.HTTPStatusError(f"HTTP {res.status_code}", request=res.request, response=res)
+                # Alchemy reports its per-second limit as HTTP 200 with a 429 error inside the body
+                body_probe = res.json() if res.status_code == 200 else None
+                items = body_probe if isinstance(body_probe, list) else [body_probe] if body_probe else []
+                if any(isinstance(it, dict) and (it.get("error") or {}).get("code") == 429 for it in items):
+                    raise httpx.HTTPStatusError("rate limited (429 in body)", request=res.request, response=res)
                 break
             except (httpx.HTTPStatusError, httpx.TransportError):
                 if attempt == 5:
@@ -128,6 +133,22 @@ class ChainReader:
 
     async def block_number(self) -> int:
         return int(await self._call("eth_blockNumber", []), 16)
+
+    async def eth_balance(self, address: str) -> int:
+        return int(await self._call("eth_getBalance", [address, "latest"]), 16)
+
+    async def eth_calls(self, calls: list[tuple[str, str]]) -> list[Optional[str]]:
+        """eth_call (to, data) at latest; a call that reverts yields None instead of failing the batch."""
+        try:
+            return await self._batch([("eth_call", [{"to": to, "data": data}, "latest"]) for to, data in calls])
+        except RpcError:
+            out = []
+            for to, data in calls:
+                try:
+                    out.append(await self._call("eth_call", [{"to": to, "data": data}, "latest"]))
+                except RpcError:
+                    out.append(None)
+            return out
 
     async def get_logs(self, from_block: int, to_block: int, *, address: Optional[str] = None,
                        topics: Optional[list] = None) -> list[dict]:

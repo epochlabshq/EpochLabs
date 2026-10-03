@@ -10,6 +10,7 @@ export function useEmileDatabase() {
   const setThresholds = useEmileStore((state) => state.setThresholds);
   const onEpochEvent = useEmileStore((state) => state.onEpochEvent);
   const requestEpochsRefresh = useEmileStore((state) => state.requestEpochsRefresh);
+  const onDeskEvent = useEmileStore((state) => state.onDeskEvent);
 
   useEffect(() => {
     const apiBase = getApiBaseUrl();
@@ -140,6 +141,9 @@ export function useEmileDatabase() {
           if (payload.epoch) {
             onEpochEvent(payload.epoch);
           }
+          if (payload.desk_state || payload.desk_waiting || payload.desk_open || payload.desk_close) {
+            onDeskEvent(payload);
+          }
           if (payload.model) {
             updateModel(payload.model);
             // Epoch I/II progress is read from the same model run: refresh it too
@@ -161,5 +165,5 @@ export function useEmileDatabase() {
     return () => {
       if (socket) socket.close();
     };
-  }, [addToken, updateModel, setSimParams, setConnected, setThresholds, onEpochEvent, requestEpochsRefresh]);
+  }, [addToken, updateModel, setSimParams, setConnected, setThresholds, onEpochEvent, requestEpochsRefresh, onDeskEvent]);
 }

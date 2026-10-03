@@ -2,7 +2,7 @@
 Idempotent schema for the Epochs page. Executed statement by statement at Epoch Watcher startup
 (asyncpg cannot run multi-statement strings) and mirrored in DDL.sql for reference.
 """
-from sqlalchemy import text
+from app.db.locks import apply_schema
 
 SCHEMA_STATEMENTS: list[str] = [
     # One row per epoch. Only `locked` or `complete` is stored: `active` is derived at read time.
@@ -111,6 +111,4 @@ SCHEMA_STATEMENTS: list[str] = [
 
 
 async def ensure_epochs_schema(db) -> None:
-    for stmt in SCHEMA_STATEMENTS:
-        await db.execute(text(stmt))
-    await db.commit()
+    await apply_schema(db, SCHEMA_STATEMENTS)

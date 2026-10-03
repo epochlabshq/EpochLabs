@@ -2,6 +2,7 @@ import asyncio
 import time
 from datetime import datetime, timezone, date
 from sqlalchemy import text
+from app.core.config import settings
 from app.db.database import AsyncSessionLocal
 from app.db.models import IngestLog
 from app.services.mint_source import get_default_mint_source
@@ -39,6 +40,9 @@ async def start_ingest_worker_loop():
     """
     global _known_tokens_cache, _cache_initialized, _last_cache_refresh, _last_label_cycle_run, _db_backoff_until
 
+    if not settings.INGEST_WORKER_ENABLED:
+        print("[INGEST WORKER] Disabled via INGEST_WORKER_ENABLED.")
+        return
     print("[INGEST WORKER] STARTING OPTIMIZED ROBINHOOD SCANNER (Waggle-efficient mode)...")
     scanner = get_default_mint_source()
     poller = DexScreenerPoller()

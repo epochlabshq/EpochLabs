@@ -4,7 +4,8 @@ from lightgbm import LGBMClassifier
 from sklearn.model_selection import StratifiedKFold, cross_val_score
 from sklearn.metrics import roc_auc_score
 
-from app.ml.features import extract_features, assert_no_leakage
+from app.ml.artifact import build_artifact
+from app.ml.features import FEATURE_NAMES, extract_features, assert_no_leakage
 from app.ml.jar_math import evaluate_jar_level
 from app.core.config import settings
 
@@ -130,10 +131,7 @@ def train_model_and_evaluate(df: pd.DataFrame) -> dict:
     )
 
     # Feature Importance calculation
-    feature_names = ["hour_sin", "hour_cos"] + [f"dow_{i}" for i in range(7)] + \
-                    ["holders_log", "lore_len", "lore_missing", "name_tokens"] + \
-                    [f"lore_pca_{i+1}" for i in range(24)]
-    
+    feature_names = FEATURE_NAMES
     importances = clf.feature_importances_
     total_imp = importances.sum()
     if total_imp > 0:
@@ -152,5 +150,8 @@ def train_model_and_evaluate(df: pd.DataFrame) -> dict:
     df_temp["passed"] = y
     hour_rates = df_temp.groupby("launch_hour_utc")["passed"].mean().to_dict()
     res["hour_rates"] = {str(k): round(float(v), 3) for k, v in hour_rates.items()}
+
+    # Everything needed to score a new token exactly as this run would (persisted by the model worker)
+    res["artifact"] = build_artifact(clf, pca_model)
 
     return res

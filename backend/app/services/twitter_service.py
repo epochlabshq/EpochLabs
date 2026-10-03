@@ -5,6 +5,7 @@ import hmac
 import hashlib
 import urllib.parse
 import httpx
+from typing import Optional
 from datetime import datetime, timezone
 from sqlalchemy import select, desc
 from app.core.config import settings
@@ -76,6 +77,7 @@ class TwitterService:
             async with AsyncSessionLocal() as db:
                 result = await db.execute(
                     select(TwitterPost.target_token)
+                    .where(TwitterPost.target_token != "desk")
                     .order_by(desc(TwitterPost.posted_at))
                     .limit(1)
                 )
@@ -111,6 +113,7 @@ class TwitterService:
             async with AsyncSessionLocal() as db:
                 result = await db.execute(
                     select(TwitterPost.posted_at)
+                    .where(TwitterPost.target_token != "desk")
                     .order_by(desc(TwitterPost.posted_at))
                     .limit(1)
                 )
@@ -127,6 +130,80 @@ class TwitterService:
 
         return True, 0.0
 
+    async def _send(self, text: str) -> tuple[str, Optional[str], Optional[str]]:
+        """
+        POST one tweet. Returns (status, tweet_id, error): 'sent', 'dry_run' (auto-post disabled or no
+        credentials) or 'failed'. Retries 429/5xx itself; touches no scheduler state.
+        """
+        is_enabled = settings.TWITTER_AUTO_POST_ENABLED and bool(
+            settings.TWITTER_API_KEY and settings.TWITTER_API_SECRET and
+            settings.TWITTER_ACCESS_TOKEN and settings.TWITTER_ACCESS_TOKEN_SECRET
+        )
+        if not is_enabled:
+            return "dry_run", None, None
+        if time.time() < self.api_backoff_until:
+            return "failed", None, "API backoff after 401/402"
+
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": generate_oauth1_header(
+                method="POST",
+                url=self.api_url,
+                params={},
+                api_key=settings.TWITTER_API_KEY,
+                api_secret=settings.TWITTER_API_SECRET,
+                access_token=settings.TWITTER_ACCESS_TOKEN,
+                access_token_secret=settings.TWITTER_ACCESS_TOKEN_SECRET
+            ),
+        }
+        payload = {"text": text}
+        retries = 0
+        max_retries = 3
+        error_msg = None
+        while retries <= max_retries:
+            try:
+                async with httpx.AsyncClient(timeout=15.0) as client:
+                    res = await client.post(self.api_url, headers=headers, json=payload)
+                if res.status_code in (200, 201):
+                    return "sent", res.json().get("data", {}).get("id"), None
+                if res.status_code in (429, 500, 502, 503, 504):
+                    retries += 1
+                    delay = (2 ** retries) + random.uniform(0.5, 1.5)
+                    print(f"[TWITTER] Warning API {res.status_code}. Retrying in {delay:.1f}s...")
+                    error_msg = f"HTTP {res.status_code}"
+                    await asyncio.sleep(delay)
+                    continue
+                error_msg = f"HTTP {res.status_code}: {res.text}"
+                print(f"[TWITTER] Error posting tweet: {error_msg}")
+                if res.status_code in (401, 402):
+                    # Credits depleted / unauthorized: backoff for 2 hours to save DB ops!
+                    self.api_backoff_until = time.time() + 7200
+                    print("[TWITTER] API credits depleted (402/401). Backing off for 2 hours to conserve DB operations...")
+                return "failed", None, error_msg
+            except Exception as e:
+                retries += 1
+                error_msg = str(e)
+                if retries > max_retries:
+                    print(f"[TWITTER] Failed after {retries} retries: {error_msg}")
+                    break
+                await asyncio.sleep((2 ** retries) + 1.0)
+        return "failed", None, error_msg
+
+    async def post_desk_tweet(self, text: str, trigger_type: str) -> dict:
+        """
+        The Desk's trade posts (desk_entry / desk_exit). Same transport and audit table as the news posts,
+        but they leave the news scheduler's cooldown and token rotation alone.
+        """
+        status_str, tweet_id, error_msg = await self._send(text)
+        try:
+            async with AsyncSessionLocal() as db:
+                db.add(TwitterPost(tweet_id=tweet_id, text=text, target_token="desk", trigger_type=trigger_type,
+                                   status=status_str, error_message=error_msg))
+                await db.commit()
+        except Exception as db_err:
+            print(f"[TWITTER SERVICE] Warning: Failed to save desk post record to DB: {db_err}")
+        return {"status": status_str, "tweet_id": tweet_id, "error_message": error_msg}
+
     async def post_tweet(self, text: str, target_token: str, trigger_type: str = "recurring_2h_news", stats: dict = None) -> dict:
         """
         Publishes a tweet to Twitter API v2, or logs as dry-run if TWITTER_AUTO_POST_ENABLED is false.
@@ -137,70 +214,10 @@ class TwitterService:
         v24 = stats.get("volume_24h", 0.0)
         holders = stats.get("holders", None)
 
-        is_enabled = settings.TWITTER_AUTO_POST_ENABLED and bool(
-            settings.TWITTER_API_KEY and settings.TWITTER_API_SECRET and 
-            settings.TWITTER_ACCESS_TOKEN and settings.TWITTER_ACCESS_TOKEN_SECRET
-        )
-
-        status_str = "sent" if is_enabled else "dry_run"
-        tweet_id = None
-        error_msg = None
-
-        if is_enabled:
-            # Perform live HTTP POST request to Twitter API v2
-            headers = {
-                "Content-Type": "application/json"
-            }
-            auth_header = generate_oauth1_header(
-                method="POST",
-                url=self.api_url,
-                params={},
-                api_key=settings.TWITTER_API_KEY,
-                api_secret=settings.TWITTER_API_SECRET,
-                access_token=settings.TWITTER_ACCESS_TOKEN,
-                access_token_secret=settings.TWITTER_ACCESS_TOKEN_SECRET
-            )
-            headers["Authorization"] = auth_header
-
-            payload = {"text": text}
-            retries = 0
-            max_retries = 3
-
-            while retries <= max_retries:
-                try:
-                    async with httpx.AsyncClient(timeout=15.0) as client:
-                        res = await client.post(self.api_url, headers=headers, json=payload)
-                        if res.status_code in (200, 201):
-                            data = res.json()
-                            tweet_id = data.get("data", {}).get("id")
-                            status_str = "sent"
-                            self.last_posted_at_memory = datetime.now(timezone.utc)
-                            self.last_target_memory = target_token
-                            print(f"[TWITTER] Successfully posted tweet ID: {tweet_id}")
-                            break
-                        elif res.status_code in (429, 500, 502, 503, 504):
-                            retries += 1
-                            delay = (2 ** retries) + random.uniform(0.5, 1.5)
-                            print(f"[TWITTER] Warning API {res.status_code}. Retrying in {delay:.1f}s...")
-                            await asyncio.sleep(delay)
-                        else:
-                            error_msg = f"HTTP {res.status_code}: {res.text}"
-                            status_str = "failed"
-                            print(f"[TWITTER] Error posting tweet: {error_msg}")
-                            if res.status_code in (401, 402):
-                                # Credits depleted / unauthorized: backoff for 2 hours to save DB ops!
-                                self.api_backoff_until = time.time() + 7200
-                                print("[TWITTER] API credits depleted (402/401). Backing off for 2 hours to conserve DB operations...")
-                            break
-                except Exception as e:
-                    retries += 1
-                    error_msg = str(e)
-                    if retries > max_retries:
-                        status_str = "failed"
-                        print(f"[TWITTER] Failed after {retries} retries: {error_msg}")
-                        break
-                    await asyncio.sleep((2 ** retries) + 1.0)
-        else:
+        status_str, tweet_id, error_msg = await self._send(text)
+        if status_str == "sent":
+            print(f"[TWITTER] Successfully posted tweet ID: {tweet_id}")
+        elif status_str == "dry_run":
             print(f"[TWITTER] Dry-Run Mode Active — Tweet payload logged to DB without posting.")
 
         # Always update in-memory timestamp so we don't immediately retry and hammer the DB
@@ -285,6 +302,9 @@ async def start_twitter_scheduler_loop():
     Background worker loop that checks every 5 minutes whether a 2-hour scheduled news post is due.
     Enforces minimum cooldown and prevents race conditions.
     """
+    if not settings.TWITTER_SCHEDULER_ENABLED:
+        print("[TWITTER SCHEDULER] Disabled via TWITTER_SCHEDULER_ENABLED.")
+        return
     print("[TWITTER SCHEDULER] Initializing 2-Hour Auto-Poster loop...")
     await asyncio.sleep(10)  # Initial grace period after startup
 

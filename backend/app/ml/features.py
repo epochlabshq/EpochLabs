@@ -4,16 +4,28 @@ from sklearn.decomposition import PCA
 
 # Lazy loaded embedding model
 _sentence_model = None
+EMBEDDER = "all-MiniLM-L6-v2"
+
+# Column order produced by extract_features. len(FEATURE_NAMES) must equal settings.CAPACITY_D.
+FEATURE_NAMES: list[str] = (
+    ["hour_sin", "hour_cos"] + [f"dow_{i}" for i in range(7)]
+    + ["holders_log", "lore_len", "lore_missing", "name_tokens"]
+    + [f"lore_pca_{i+1}" for i in range(24)]
+)
 
 def get_sentence_model():
     global _sentence_model
     if _sentence_model is None:
         try:
             from sentence_transformers import SentenceTransformer
-            _sentence_model = SentenceTransformer("all-MiniLM-L6-v2")
+            _sentence_model = SentenceTransformer(EMBEDDER)
         except ImportError:
             _sentence_model = None
     return _sentence_model
+
+def embedder_name() -> str | None:
+    """The lore embedder in use, or None when lore embeddings fall back to zeros."""
+    return EMBEDDER if get_sentence_model() is not None else None
 
 def extract_features(df: pd.DataFrame, pca_model: PCA | None = None) -> tuple[np.ndarray, PCA]:
     """

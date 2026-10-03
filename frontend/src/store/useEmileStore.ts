@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { EpochEvent, EpochsPayload } from '@/components/epochs/types';
+import type { ClosedTrade, DeskEvent, DeskPayload, OpenTrade } from '@/components/desk/types';
 
 export interface TokenItem {
   mint: string;
@@ -72,6 +73,13 @@ interface EmileState {
   epochsVersion: number;
   justCompleted: number | null;
 
+  // The Desk (/api/desk). WS desk_* events patch it in place; `deskVersion` bumps to trigger a refetch
+  // so totals and the heartbeat catch up with the event.
+  desk: DeskPayload | null;
+  deskError: boolean;
+  deskVersion: number;
+  deskFlashId: string | null;
+
   // Interactive Simulation state
   simState: {
     n: number;
@@ -90,6 +98,8 @@ interface EmileState {
   setEpochs: (payload: EpochsPayload | null, error?: boolean) => void;
   onEpochEvent: (evt: EpochEvent) => void;
   requestEpochsRefresh: () => void;
+  setDesk: (payload: DeskPayload | null, error?: boolean) => void;
+  onDeskEvent: (evt: DeskEvent) => void;
   setSimParams: (params: Partial<{ n: number; auc: number; d: number; running: boolean }>) => void;
   resetSim: () => void;
 }
@@ -127,6 +137,11 @@ export const useEmileStore = create<EmileState>((set, get) => ({
   epochsError: false,
   epochsVersion: 0,
   justCompleted: null,
+
+  desk: null,
+  deskError: false,
+  deskVersion: 0,
+  deskFlashId: null,
 
   simState: {
     n: 0,
@@ -187,6 +202,37 @@ export const useEmileStore = create<EmileState>((set, get) => ({
   onEpochEvent: (evt) => set((state) => ({ justCompleted: evt.id, epochsVersion: state.epochsVersion + 1 })),
 
   requestEpochsRefresh: () => set((state) => ({ epochsVersion: state.epochsVersion + 1 })),
+
+  setDesk: (payload, error = false) => set(payload ? { desk: payload, deskError: false } : { deskError: error }),
+
+  onDeskEvent: (evt) => set((state) => {
+    const bump = { deskVersion: state.deskVersion + 1 };
+    const desk = state.desk;
+    if (!desk) return bump;
+    if ('desk_state' in evt) {
+      return { ...bump, desk: { ...desk, state: evt.desk_state.state, blocked_by: evt.desk_state.blocked_by } };
+    }
+    if ('desk_waiting' in evt) {
+      return { ...bump, desk: { ...desk, waiting: evt.desk_waiting.waiting } };
+    }
+    if ('desk_open' in evt) {
+      const { status, ...trade } = evt.desk_open;
+      if (status !== 'open' || desk.open.some((t) => t.id === trade.id)) return bump;
+      return { ...bump, deskFlashId: trade.id, desk: { ...desk, open: [trade as OpenTrade, ...desk.open] } };
+    }
+    const { status, ...trade } = evt.desk_close;
+    if (status !== 'closed') return bump;
+    return {
+      ...bump,
+      deskFlashId: trade.id,
+      desk: {
+        ...desk,
+        open: desk.open.filter((t) => t.id !== trade.id),
+        closed: [trade as ClosedTrade, ...desk.closed.filter((t) => t.id !== trade.id)],
+        closed_total: desk.closed.some((t) => t.id === trade.id) ? desk.closed_total : desk.closed_total + 1,
+      },
+    };
+  }),
 
   setSimParams: (params) => set((state) => ({ simState: { ...state.simState, ...params } })),
 
