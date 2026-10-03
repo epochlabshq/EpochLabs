@@ -64,15 +64,16 @@ export const HeadRow: React.FC<{ cols: string; labels: string[] }> = ({ cols, la
   </div>
 );
 
-export const Cell: React.FC<{ label: string; children: React.ReactNode; first?: boolean; className?: string }> = ({
+export const Cell: React.FC<{ label: string; children: React.ReactNode; first?: boolean; className?: string; wrap?: boolean }> = ({
   label,
   children,
   first = false,
   className = '',
+  wrap = false,
 }) => (
   <div className={`min-w-0 ${first ? 'col-span-2 md:col-span-1' : 'md:text-right'} ${className}`}>
     {!first && <div className="md:hidden font-mono text-[10px] uppercase tracking-[0.16em] text-[var(--faint)]">{label}</div>}
-    <div className="font-mono text-[12.5px] text-[var(--fg)] md:truncate">{children}</div>
+    <div className={`font-mono text-[12.5px] text-[var(--fg)] ${wrap ? 'whitespace-nowrap' : 'md:truncate'}`}>{children}</div>
   </div>
 );
 
@@ -80,9 +81,9 @@ export const rowClass = (cols: string) =>
   `grid grid-cols-2 ${cols} gap-x-4 gap-y-2.5 md:gap-y-0 items-center rounded-xl md:rounded-lg border border-[var(--border)] bg-[var(--panel)] px-4 py-3`;
 
 /** Survival as a bar with the entry threshold marked, plus the number. */
-export const SurvivalBar: React.FC<{ value: number | null; threshold: number }> = ({ value, threshold }) => (
+export const SurvivalBar: React.FC<{ value: number | null; threshold: number; wide?: boolean }> = ({ value, threshold, wide = false }) => (
   <span className="inline-flex items-center gap-2 justify-end">
-    <span aria-hidden className="relative hidden sm:inline-block w-14 h-1.5 rounded-full bg-[var(--soft)] overflow-hidden">
+    <span aria-hidden className={`relative hidden sm:inline-block ${wide ? 'w-24 h-2' : 'w-14 h-1.5'} rounded-full bg-[var(--soft)] overflow-hidden`}>
       {value !== null && (
         <span
           className={`absolute inset-y-0 left-0 rounded-full ${value >= threshold ? 'bg-[var(--banana)]' : 'bg-[var(--faint)]'}`}

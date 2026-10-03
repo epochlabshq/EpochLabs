@@ -14,6 +14,7 @@ from app.db.database import AsyncSessionLocal, get_db
 from app.api.endpoints import get_latest_model, serialize_model_run
 from app.api.epochs_endpoints import load_completed
 from app.services import desk_chain
+from app.services.desk_paper import load_paper_trades, serialize_paper
 from app.services.desk import (
     Decision, anonymize_waiting, derive_state, gated_reason, group_trades, heartbeat, revealed_drops,
     serialize_closed, serialize_open, totals, watching_rows, WAITING_STAGES, WEI,
@@ -52,6 +53,9 @@ class DeskInputs:
     watching_not_onchain: int = 0
     watching_no_price: int = 0
     watching_below_min: int = 0
+    watching_below_threshold: int = 0
+    paper_trades: list[dict] = field(default_factory=list)
+    paper_marks: dict[str, dict] = field(default_factory=dict)
     balance_wei: Optional[int] = None
     marks: dict[str, tuple[int, int]] = field(default_factory=dict)
     decimals: dict[str, Optional[int]] = field(default_factory=dict)
@@ -123,8 +127,11 @@ def build_desk_payload(inp: DeskInputs, now: datetime) -> dict:
         "watching_not_onchain": inp.watching_not_onchain,
         "watching_no_price": inp.watching_no_price,
         "watching_below_min": inp.watching_below_min,
+        "watching_below_threshold": inp.watching_below_threshold,
         "watch_min_mc_usd": settings.DESK_WATCH_MIN_MC_USD,
         "take_profit_mc_usd": settings.DESK_TP_MC_USD,
+        "stop_loss_mc_usd": settings.DESK_SL_MC_USD,
+        "max_hold_h": settings.DESK_MAX_HOLD_H,
         "waiting": waiting,
         "dropped_revealed": [
             {**d, "token": {**_addr(d["token"]), **{k: v for k, v in (inp.meta.get(d["token"].lower()) or {}).items()
@@ -134,6 +141,11 @@ def build_desk_payload(inp: DeskInputs, now: datetime) -> dict:
         "open": open_rows,
         "closed": closed_rows[:settings.DESK_CLOSED_LIMIT],
         "closed_total": len(closed_rows),
+        # SIMULATION: hypothetical fills at real DexScreener prices. Never counted in wallet or PnL above.
+        "simulation": {
+            "enabled": settings.DESK_PAPER_ENABLED,
+            "trades": serialize_paper(inp.paper_trades, inp.paper_marks)[::-1],
+        },
         "generated_at": now.isoformat(),
     }
 
@@ -168,15 +180,25 @@ async def load_desk_inputs(db: AsyncSession, with_chain: bool = True) -> DeskInp
         "SELECT t.mint, t.name, t.symbol, GREATEST(t.peak_mc::float, dm.peak_seen_usd) AS peak_mc, "
         "dm.mc_usd AS mc_now, dm.pair_url, dm.fetched_at AS mc_at, t.launched_at, "
         "COALESCE(t.holders, lh.holders) AS holders, lh.sampled_at AS holders_sampled_at, s.survival "
-        "FROM tokens t JOIN desk_market dm ON dm.mint = t.mint AND dm.mc_usd >= :lo "
+        "FROM tokens t JOIN desk_market dm ON dm.mint = t.mint AND dm.mc_usd >= :lo AND dm.mc_usd < :hi "
+        # A pool with no real liquidity has a market cap on paper only: Golem could never trade it
+        "AND dm.liq_usd >= :minliq "
         "LEFT JOIN desk_scores s ON s.mint = t.mint AND s.run_id = :run "
         "LEFT JOIN desk_live_holders lh ON lh.mint = t.mint "
         "WHERE t.status::text = 'pending' AND t.chain = 'robinhood' "
         "AND t.mint ~ '^0x[0-9a-fA-F]{40}$' AND COALESCE(lh.has_code, true) "
         "AND t.launched_at > now() - make_interval(hours => :h) "
+        # A scored token under the entry threshold is dropped from the list so the slot goes to the next one
+        "AND (s.survival IS NULL OR s.survival >= :thr) "
         "ORDER BY s.survival DESC NULLS LAST, dm.mc_usd DESC LIMIT :lim"
-    ), {"run": model["run_id"] if model else -1, "h": settings.DESK_MAX_HOLD_H,
-        "lim": settings.DESK_WATCHING_LIMIT, "lo": settings.DESK_WATCH_MIN_MC_USD})).mappings().all()
+    ), {"run": model["run_id"] if model else -1, "h": settings.DESK_MAX_HOLD_H, "thr": settings.DESK_ENTRY_THRESHOLD,
+        "lim": settings.DESK_WATCHING_LIMIT, "lo": settings.DESK_WATCH_MIN_MC_USD,
+        "hi": settings.DESK_TP_MC_USD, "minliq": settings.DESK_MIN_LIQ_USD})).mappings().all()
+    below_threshold = (await db.execute(text(
+        "SELECT count(*) FROM desk_scores s JOIN desk_market dm ON dm.mint = s.mint AND dm.mc_usd >= :lo "
+        "WHERE s.run_id = :run AND s.survival < :thr"
+    ), {"run": model["run_id"] if model else -1, "thr": settings.DESK_ENTRY_THRESHOLD,
+        "lo": settings.DESK_WATCH_MIN_MC_USD})).scalar()
     # Watched rows left out of the list right now, by reason
     hidden = (await db.execute(text(
         "SELECT count(*) FILTER (WHERE dm.mint IS NULL OR dm.mc_usd IS NULL) AS no_price, "
@@ -236,7 +258,16 @@ async def load_desk_inputs(db: AsyncSession, with_chain: bool = True) -> DeskInp
         watching_not_onchain=int(not_onchain or 0),
         watching_no_price=int(hidden["no_price"] or 0),
         watching_below_min=int(hidden["below_min"] or 0),
+        watching_below_threshold=int(below_threshold or 0),
     )
+    if settings.DESK_PAPER_ENABLED:
+        inp.paper_trades = await load_paper_trades(db)
+        open_mints = [p["mint"] for p in inp.paper_trades if p["exit_at"] is None]
+        if open_mints:
+            rows = (await db.execute(text(
+                "SELECT mint, price_usd, mc_usd FROM desk_market WHERE mint = ANY(:m)"
+            ), {"m": open_mints})).mappings().all()
+            inp.paper_marks = {r["mint"]: dict(r) for r in rows}
     if with_chain:
         r = await desk_chain.reader()
         if r is not None:

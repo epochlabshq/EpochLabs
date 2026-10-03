@@ -3,6 +3,7 @@
 import React from 'react';
 import { BLOCKER_LABEL, DESK_COPY } from '@/config/deskCopy';
 import { useEmileStore } from '@/store/useEmileStore';
+import { SimClosedRows, SimOpenRows } from './SimTables';
 import { Cell, Empty, HeadRow, LiveNumber, Panel, TxLink, rowClass, useNow } from './DeskUi';
 import {
   EXIT_REASON_LABEL, ageSince, fmtAmount, fmtDuration, fmtEth, fmtPrice, fmtSignedEth, fmtSignedPct, fmtUsdCompact,
@@ -43,9 +44,15 @@ export const OpenPositions: React.FC<{ data: DeskPayload; onWhy: (id: string) =>
   const now = useNow(30_000);
   const flashId = useEmileStore((s) => s.deskFlashId);
   const blocked = data.state === 'gated' || data.state === 'paused';
+  const simOpen = (data.simulation?.trades ?? []).filter((t) => !t.exit);
   return (
-    <Panel id="open" title="Open positions" count={data.open.length} note="Live PnL values held tokens at the pair's current mid price. Click a row for why Golem entered.">
-      {data.open.length === 0 ? (
+    <Panel
+      id="open"
+      title="Open positions"
+      count={data.open.length + simOpen.length}
+      note={`Live PnL values held tokens at the pair's current mid price. Click a real row for why Golem entered.${simOpen.length ? ' SIMULATION rows are paper trades: no funds, no transactions.' : ''}`}
+    >
+      {data.open.length === 0 && simOpen.length > 0 ? null : data.open.length === 0 ? (
         <Empty>
           {data.state === 'gated' && data.blocked_by ? (
             <>
@@ -82,6 +89,7 @@ export const OpenPositions: React.FC<{ data: DeskPayload; onWhy: (id: string) =>
           </ol>
         </>
       )}
+      <SimOpenRows trades={simOpen} data={data} />
     </Panel>
   );
 };
@@ -89,14 +97,15 @@ export const OpenPositions: React.FC<{ data: DeskPayload; onWhy: (id: string) =>
 export const ClosedTrades: React.FC<{ data: DeskPayload; onWhy: (id: string) => void }> = ({ data, onWhy }) => {
   const flashId = useEmileStore((s) => s.deskFlashId);
   const shown = data.closed.length;
+  const simClosed = (data.simulation?.trades ?? []).filter((t) => t.exit);
   return (
     <Panel
       id="closed"
       title="Closed trades"
-      count={data.closed_total}
+      count={data.closed_total + simClosed.length}
       note={`Every finished trade, newest first, wins and losses alike. ${data.pnl.wins} won · ${data.pnl.losses} lost${shown < data.closed_total ? ` · showing the latest ${shown}` : ''}.`}
     >
-      {shown === 0 ? (
+      {shown === 0 && simClosed.length > 0 ? null : shown === 0 ? (
         <Empty>{DESK_COPY.closedEmpty}</Empty>
       ) : (
         <>
@@ -122,6 +131,7 @@ export const ClosedTrades: React.FC<{ data: DeskPayload; onWhy: (id: string) => 
           </ol>
         </>
       )}
+      <SimClosedRows trades={simClosed} />
     </Panel>
   );
 };

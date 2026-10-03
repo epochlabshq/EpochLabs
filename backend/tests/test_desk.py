@@ -284,7 +284,7 @@ class TestWatching(unittest.TestCase):
                               watched("0x" + "cc" * 20, "C", "C", None)],
                              0.65, frozenset(), 50)
         self.assertEqual([(r["token"]["name"], r["status"]) for r in rows],
-                         [("A", "scoring"), ("B", "below_threshold"), ("C", "unscored")])
+                         [("A", "scoring"), ("C", "unscored")])  # B is below the threshold: dropped
 
     def test_token_without_holders_awaits_holders(self):
         row = {**watched(TOKEN, "A", "A", None), "holders": None}

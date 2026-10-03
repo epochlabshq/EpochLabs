@@ -7,8 +7,9 @@ import { StatusBar } from '@/components/desk/StatusBar';
 import { WaitingPanel, WatchingPanel } from '@/components/desk/WatchingPanel';
 import { ClosedTrades, OpenPositions } from '@/components/desk/TradesPanels';
 import { WhyCardDialog } from '@/components/desk/WhyCard';
+import { SimulationCard } from '@/components/desk/SimulationCard';
 import { DeskFooter } from '@/components/desk/DeskFooter';
-import { DESK_COMING_SOON, DESK_HERO, DESK_STATE_LABEL } from '@/config/deskCopy';
+import { DESK_SIMULATION, DESK_HERO, DESK_STATE_LABEL } from '@/config/deskCopy';
 import { useEmileDatabase } from '@/hooks/useEmileDatabase';
 import { useDesk } from '@/hooks/useDesk';
 import { useEmileStore } from '@/store/useEmileStore';
@@ -41,22 +42,8 @@ export default function DeskPage() {
               <p className="text-[var(--dim)] text-[15px] md:text-base max-w-[56ch] mt-4 leading-relaxed">{DESK_HERO.intro}</p>
             </div>
 
-            {/* Until Golem may trade, the desk only watches: say so where the trading would be */}
-            {data?.state === 'gated' && (
-              <div className="relative min-w-0 rounded-2xl border border-dashed border-[var(--banana)]/50 bg-[var(--panel)]/70 backdrop-blur px-6 py-7 md:px-8 md:py-9 text-center overflow-hidden">
-                <div aria-hidden className="absolute inset-0 epochs-bloom opacity-40 pointer-events-none" />
-                <div className="relative">
-                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-[var(--banana)]/60 font-mono text-[10.5px] uppercase tracking-[0.25em] text-[var(--banana)]">
-                    <span className="w-1.5 h-1.5 rounded-full bg-[var(--banana)] epochs-pulse" />
-                    {DESK_COMING_SOON.badge}
-                  </div>
-                  <p className="font-sans font-semibold text-3xl md:text-4xl tracking-tight text-[var(--fg-hi)] mt-4">
-                    {DESK_COMING_SOON.title}
-                  </p>
-                  <p className="text-[var(--dim)] text-[14px] mt-3 max-w-[40ch] mx-auto leading-relaxed">{DESK_COMING_SOON.body}</p>
-                </div>
-              </div>
-            )}
+            {/* Golem's simulated live trading: paper trades at real prices, running while live trading is gated */}
+            {data?.simulation?.enabled && <SimulationCard trades={data.simulation.trades} />}
           </div>
         </section>
 

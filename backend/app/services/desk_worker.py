@@ -24,6 +24,8 @@ from app.api.desk_endpoints import build_desk_payload, find_trade, invalidate_de
 from app.api.websocket import manager
 from app.services.desk import group_trades
 from app.services.desk_executor import run_executor_cycle
+from app.services.desk_discovery import discover_tokens
+from app.services.desk_paper import run_paper_cycle
 from app.services.desk_poster import initial_post_status, post_due
 from app.services import desk_chain
 from app.services.live_holders import refresh_live_holders
@@ -40,11 +42,11 @@ async def score_watching(db) -> int:
     # Only tokens that exist on Robinhood Chain (feed rows from other chains are never scored)
     mints = [r[0] for r in (await db.execute(text(
         "SELECT t.mint FROM tokens t JOIN desk_live_holders lh ON lh.mint = t.mint AND lh.has_code "
-        "JOIN desk_market dm ON dm.mint = t.mint AND dm.mc_usd >= :lo AND dm.mc_usd < :hi "
+        "JOIN desk_market dm ON dm.mint = t.mint AND dm.mc_usd >= :lo AND dm.mc_usd < :hi AND dm.liq_usd >= :liq "
         "WHERE t.status::text = 'pending' AND t.chain = 'robinhood' "
         "AND t.launched_at > now() - make_interval(hours => :h)"
     ), {"h": settings.DESK_MAX_HOLD_H, "lo": settings.DESK_WATCH_MIN_MC_USD,
-        "hi": settings.DESK_TP_MC_USD})).all()]
+        "hi": settings.DESK_TP_MC_USD, "liq": settings.DESK_MIN_LIQ_USD})).all()]
     if not mints:
         return 0
     scores = await score_mints(db, mints)
@@ -99,6 +101,12 @@ async def run_desk_cycle() -> None:
         try:
             now = datetime.now(timezone.utc)
             try:
+                added = await discover_tokens(db)
+                print(f"[DESK WORKER] Discovered {added} new tokens on DexScreener", flush=True)
+            except Exception as e:
+                await db.rollback()
+                print(f"[DESK WORKER] Discovery failed: {type(e).__name__} {e}", flush=True)
+            try:
                 updated = await refresh_live_holders(
                     db, await desk_chain.log_reader(), await desk_chain.transfers_reader(),
                     max_age_h=settings.DESK_MAX_HOLD_H, limit=settings.DESK_HOLDERS_BATCH,
@@ -122,6 +130,14 @@ async def run_desk_cycle() -> None:
             except ScorerUnavailable as e:
                 await db.rollback()
                 print(f"[DESK WORKER] Scoring unavailable: {e}", flush=True)
+
+            if settings.DESK_PAPER_ENABLED:
+                try:
+                    for line in await run_paper_cycle(db):
+                        print(f"[DESK PAPER] {line}", flush=True)
+                except Exception as e:
+                    await db.rollback()
+                    print(f"[DESK PAPER] Cycle failed: {type(e).__name__} {e}", flush=True)
 
             await mark_confirmed_candidates(db)
             inp = await load_desk_inputs(db)

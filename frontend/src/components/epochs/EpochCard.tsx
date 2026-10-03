@@ -66,7 +66,7 @@ const Progress: React.FC<{ epoch: EpochItem }> = ({ epoch }) => {
       </div>
     );
   }
-  const sand = Math.max(80, (pr.jar_level ?? 0) * 100);
+  const sand = 100;
   return (
     <div className="mt-4 space-y-2">
       <div className="flex justify-between font-mono text-[11.5px] text-[var(--dim)]">

@@ -43,9 +43,9 @@ export const DESK_COPY = {
   footer: "Every number here comes from the chain or Golem's decision log. Research experiment. Not financial advice.",
 };
 
-// Shown in the hero while Golem is gated (not allowed to trade yet)
-export const DESK_COMING_SOON = {
-  badge: 'Coming soon',
-  title: 'Live trading',
-  body: 'Golem opens its first position once the hourglass is full. Until then, it watches and scores every token.',
+// Hero card: Golem's simulated live trading (paper trades at real prices; no funds)
+export const DESK_SIMULATION = {
+  badge: 'Simulation · live',
+  title: 'Live trading simulation',
+  body: 'Golem trades on paper at real DexScreener prices, with the same entry and exit rules as live. No funds, no transactions.',
 };

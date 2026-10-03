@@ -93,6 +93,18 @@ export interface ClosedTrade {
   why?: WhyCard | null;
 }
 
+// SIMULATION: hypothetical fills at real DexScreener prices; no funds, never part of the wallet or PnL
+export interface PaperTrade {
+  id: string;
+  token: DeskToken;
+  survival: number;
+  entry: { at: string; price_usd: number; mc_usd: number | null };
+  exit: { at: string; price_usd: number | null; mc_usd: number | null } | null;
+  exit_reason: 'take_profit' | 'stop_loss' | 'max_hold' | null;
+  mark_price_usd: number | null;
+  pnl_pct: number | null;
+}
+
 export type TradeDetail = ({ status: 'open' } & OpenTrade) | ({ status: 'closed' } & ClosedTrade);
 
 export interface DeskPayload {
@@ -109,14 +121,18 @@ export interface DeskPayload {
   watching: WatchingRow[];
   watching_not_onchain: number; // feed rows with no contract on Robinhood Chain: counted, not shown
   watching_no_price: number; // on Robinhood Chain but no DexScreener pair
+  watching_below_threshold: number; // scored under the entry threshold: dropped from Watching
   watching_below_min: number; // market cap fell back under the $10K bar
   watch_min_mc_usd: number;
   take_profit_mc_usd: number;
+  stop_loss_mc_usd?: number;
+  max_hold_h?: number;
   waiting: WaitingSlot[];
   dropped_revealed: { slot: number; token: DeskToken; survival: number; dropped_reason: string; dropped_at: string }[];
   open: OpenTrade[];
   closed: ClosedTrade[];
   closed_total: number;
+  simulation?: { enabled: boolean; trades: PaperTrade[] };
   generated_at: string;
 }
 
@@ -179,7 +195,14 @@ export const ageSince = (iso: string | null, now: number) =>
 export const pnlTone = (v: number | null) =>
   v === null || v === 0 ? 'text-[var(--fg)]' : v > 0 ? 'text-[var(--live)]' : 'text-[var(--stall)]';
 
-export const tokenLabel = (t: DeskToken) => t.symbol || t.name || `${t.address.slice(0, 6)}…${t.address.slice(-4)}`;
+// Always UTC, so the log reads the same for everyone
+export const fmtDateTime = (iso: string) =>
+  `${new Date(iso).toLocaleString('en-GB', {
+    timeZone: 'UTC', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
+    second: '2-digit', hour12: false,
+  })} UTC`;
+
+export const tokenLabel =(t: DeskToken) => t.symbol || t.name || `${t.address.slice(0, 6)}…${t.address.slice(-4)}`;
 
 export const EXIT_REASON_LABEL: Record<string, string> = {
   take_profit: 'Take-profit',

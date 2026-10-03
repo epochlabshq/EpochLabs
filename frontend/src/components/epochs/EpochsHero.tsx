@@ -14,10 +14,10 @@ const DUST = Array.from({ length: 22 }, (_, i) => ({
 }));
 
 export const EpochsHero: React.FC<{ data: EpochsPayload | null; error?: boolean }> = ({ data, error = false }) => {
-  // Hardcoded sand level to 80%
+  // Hardcoded sand level to 100%
   const model = data?.model ?? null;
-  const sand = 80;
-  const provenFloor = model ? Math.max(0.580, model.proven_floor) : 0.580;
+  const sand = 100;
+  const provenFloor = model ? Math.max(0.600, model.proven_floor) : 0.600;
   const total = data?.epochs.length ?? 6;
   const status = !data
     ? null

@@ -87,6 +87,8 @@ def watching_rows(tokens: list[dict], threshold: float, excluded: frozenset[str]
             status = "awaiting_holders" if t.get("holders") is None else "unscored"
         else:
             status = "scoring" if survival >= threshold else "below_threshold"
+        if status in ("below_threshold", "reached_tp"):
+            continue  # dropped: the slot goes to the next token (reached_tp is never bought)
         rows.append({
             "token": {"name": t["name"], "symbol": t["symbol"], "address": t["mint"],
                       "dexscreener_url": t.get("pair_url") or f"https://dexscreener.com/robinhood/{t['mint'].lower()}"},

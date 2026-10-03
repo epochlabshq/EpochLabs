@@ -57,6 +57,23 @@ SCHEMA_STATEMENTS: list[str] = [
         CHECK (stage <> 'dropped' OR (dropped_reason IS NOT NULL AND dropped_at IS NOT NULL))
     )
     """,
+    # SIMULATION: hypothetical fills at real DexScreener prices (app.services.desk_paper). No money, no tx.
+    """
+    CREATE TABLE IF NOT EXISTS desk_paper_trades (
+        id               BIGSERIAL PRIMARY KEY,
+        mint             TEXT NOT NULL UNIQUE,
+        name             TEXT,
+        symbol           TEXT,
+        survival         DOUBLE PRECISION NOT NULL,
+        entry_at         TIMESTAMPTZ NOT NULL,
+        entry_mc_usd     DOUBLE PRECISION,
+        entry_price_usd  DOUBLE PRECISION NOT NULL,
+        exit_at          TIMESTAMPTZ,
+        exit_mc_usd      DOUBLE PRECISION,
+        exit_price_usd   DOUBLE PRECISION,
+        exit_reason      TEXT CHECK (exit_reason IN ('take_profit', 'stop_loss', 'max_hold'))
+    )
+    """,
     # Golem's state and heartbeat (single row)
     """
     CREATE TABLE IF NOT EXISTS desk_state (

@@ -152,6 +152,8 @@ class Settings(BaseSettings):
     DESK_X_POST_MAX_AGE_H: int = int(os.getenv("DESK_X_POST_MAX_AGE_H", "6"))
     DESK_PUBLIC_URL: str = os.getenv("DESK_PUBLIC_URL", "https://epochlabs.run/desk")
     # Executor: "off" (default), "dry_run" (evaluate and log only, writes nothing) or "live" (needs a signer)
+    # SIMULATION: log hypothetical buys/sells at real prices, independent of the trade gate. No funds involved.
+    DESK_PAPER_ENABLED: bool = os.getenv("DESK_PAPER_ENABLED", "true").lower() in ("true", "1", "yes")
     DESK_EXECUTOR_MODE: str = os.getenv("DESK_EXECUTOR_MODE", "off").lower()
     DESK_MAX_WALLET_FRACTION: float = float(os.getenv("DESK_MAX_WALLET_FRACTION", "0.2"))
     DESK_GAS_RESERVE_ETH: float = float(os.getenv("DESK_GAS_RESERVE_ETH", "0.005"))
