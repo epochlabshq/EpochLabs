@@ -120,6 +120,7 @@ async def sync_wallet_transfers(db) -> int:
                 existing.add(tx_hash)
                 new_count += 1
 
+            print(f"[WALLET SYNC] Polled {wallet}: {len(all_transfers)} onchain transfers, {new_count} new recorded.", flush=True)
             if new_count > 0:
                 await db.commit()
             return new_count
