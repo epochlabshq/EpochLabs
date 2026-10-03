@@ -39,7 +39,7 @@ Fase 1 bagian logika murni bisa jalan tanpa ini, tapi trigger nyata tidak bisa d
 - [ ] **D1. Gate resmi** untuk Epoch I/II: 2000 / 200 / 0.05 (methodology) atau 1000 / 300 / 0.02 (dashboard)?
 - [ ] **D2. Capacity `d`**: 28 atau 41?
 - [ ] **D3. Rumus jar**: diskalakan dari `proven_floor` (disarankan) atau dari `auc_mean`?
-- [ ] **D4. Alamat Epoch III**: swap dari `golem_wallet` (`0x0254…dED6`) atau signer `agent` (`0x560E…14aD`)? Disarankan: tx `from == golem_wallet`, `to == UniswapV2Router`, lalu jelaskan peran agent sebagai signer EIP-712 di halaman.
+- [ ] **D4. Alamat Epoch III**: swap dari `golem_wallet` (`0x49Ed…582C`) atau signer `agent` (`0x560E…14aD`)? Disarankan: tx `from == golem_wallet`, `to == UniswapV2Router`, lalu jelaskan peran agent sebagai signer EIP-712 di halaman.
 - [ ] **D5. Burn address** dan aturan burn: per trade atau net per periode? Pakai high-water mark?
 - [ ] **D6. Aturan Golem Launch** (fee, pembelian awal oleh tim, batas modal) dipublikasikan sebelum Epoch V dibuka.
 - [ ] **D7. Epoch VI**: Open Golem atau Multisig Handoff (`OwnershipTransferred` dari `0x2f96…3bd1`)?
@@ -94,7 +94,7 @@ BLOCKSCOUT_BASE: str = os.getenv("BLOCKSCOUT_BASE", "https://robinhoodchain.bloc
 EPOCH_LAUNCHER: str = "0x75fd64Cc8D57c529f34089Ac9083E704c23F0D8B"
 EPOCH_TOKEN_TEMPLATE: str = "0x96508719c110a341708546de78051e020f51D264"
 GOLEM_AGENT: str = "0x560Eb3767434006b3278810f906d7677C38914aD"
-GOLEM_WALLET: str = "0x0254207EA6658a8F9DAF1EAE0C120796b317dED6"
+GOLEM_WALLET: str = "0x49EdF5f24216e02EEb6a947cC3dF0CDB6B84582C"
 EPC_BURN_ADDRESS: str | None = os.getenv("EPC_BURN_ADDRESS") or None
 UNISWAP_V2_ROUTER: str = os.getenv("UNISWAP_V2_ROUTER", "")
 GOLEM_GITHUB_REPO: str = os.getenv("GOLEM_GITHUB_REPO", "")
