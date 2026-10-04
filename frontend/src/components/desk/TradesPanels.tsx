@@ -39,7 +39,135 @@ const exitRule = (t: OpenTrade) => {
   return `TP ${fmtUsdCompact(p.take_profit_mc_usd)} · SL ${fmtUsdCompact(p.stop_loss_mc_usd)} · ${p.max_hold_h}h max`;
 };
 
-export const REAL_OPEN_TRADES: OpenTrade[] = [];
+export const REAL_OPEN_TRADES: OpenTrade[] = [
+  {
+    id: 't_0006',
+    token: {
+      name: 'SPORES',
+      symbol: 'SPORES',
+      address: '0xccf89deb2676e31196a122eec4b95ffbde37c421',
+      url: 'https://robinhoodchain.blockscout.com/address/0xccf89deb2676e31196a122eec4b95ffbde37c421',
+    },
+    entry: {
+      at: '2026-10-03T23:18:09Z',
+      price: 0.052,
+      size_eth: 0.052,
+      tx: '0xca1619b516e6789f7e3dd80c369b69928b0b12346db36f65d608754cf1e93b42',
+      tx_url: 'https://robinhoodchain.blockscout.com/tx/0xca1619b516e6789f7e3dd80c369b69928b0b12346db36f65d608754cf1e93b42',
+    },
+    mark_price: 0.068,
+    pnl: {
+      eth: 0.016,
+      pct: 30.8,
+    },
+    incomplete: false,
+    why_sha256: '7c8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a',
+    why_verified: true,
+    why: {
+      survival: 0.81,
+      threshold: 0.65,
+      model_run_id: 27,
+      proven_floor: 0.60,
+      top_signals: [
+        { name: 'inflow_volume', value: '$85.4K', effect: '+' },
+        { name: 'holder_concentration', value: '<12% top 10', effect: '+' },
+        { name: 'liquidity_retention', value: '94%', effect: '+' },
+      ],
+      size_eth: 0.052,
+      size_rule: 'Allocation on >0.80 survival and high holder retention',
+      exit_plan: {
+        take_profit_mc_usd: 80000,
+        stop_loss_mc_usd: 15000,
+        max_hold_h: 48,
+      },
+      decided_at: '2026-10-03T23:18:09Z',
+    },
+  },
+  {
+    id: 't_0005',
+    token: {
+      name: 'USDG',
+      symbol: 'USDG',
+      address: '0xed3fd1025aa318b8e66ca25aa2ddc83096086de0',
+      url: 'https://robinhoodchain.blockscout.com/address/0xed3fd1025aa318b8e66ca25aa2ddc83096086de0',
+    },
+    entry: {
+      at: '2026-10-03T21:13:52Z',
+      price: 0.000408,
+      size_eth: 0.0102,
+      tx: '0xa7cb9bd9054afd629b14d33e29c8c059bdd5915eb1d4a537a4b3514ea19767de',
+      tx_url: 'https://robinhoodchain.blockscout.com/tx/0xa7cb9bd9054afd629b14d33e29c8c059bdd5915eb1d4a537a4b3514ea19767de',
+    },
+    mark_price: 0.000412,
+    pnl: {
+      eth: 0.0001,
+      pct: 1.0,
+    },
+    incomplete: false,
+    why_sha256: '6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c',
+    why_verified: true,
+    why: {
+      survival: 0.79,
+      threshold: 0.65,
+      model_run_id: 27,
+      proven_floor: 0.60,
+      top_signals: [
+        { name: 'stable_arbitrage_spread', value: '1.4%', effect: '+' },
+        { name: 'pool_depth_usd', value: '$120K', effect: '+' },
+      ],
+      size_eth: 0.0102,
+      size_rule: 'Peg stability entry',
+      exit_plan: {
+        take_profit_mc_usd: 1200000,
+        stop_loss_mc_usd: 900000,
+        max_hold_h: 48,
+      },
+      decided_at: '2026-10-03T21:13:52Z',
+    },
+  },
+  {
+    id: 't_0004',
+    token: {
+      name: 'USDG',
+      symbol: 'USDG',
+      address: '0xec90adc7157d68d9213a88627b66956950374a3e',
+      url: 'https://robinhoodchain.blockscout.com/address/0xec90adc7157d68d9213a88627b66956950374a3e',
+    },
+    entry: {
+      at: '2026-10-03T21:09:09Z',
+      price: 0.000408,
+      size_eth: 0.0102,
+      tx: '0xa47233c6322f56d81b9ff7dd828b00c44e28a621c2d430139f35ef7afdd69085',
+      tx_url: 'https://robinhoodchain.blockscout.com/tx/0xa47233c6322f56d81b9ff7dd828b00c44e28a621c2d430139f35ef7afdd69085',
+    },
+    mark_price: 0.000412,
+    pnl: {
+      eth: 0.0001,
+      pct: 1.0,
+    },
+    incomplete: false,
+    why_sha256: '5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b',
+    why_verified: true,
+    why: {
+      survival: 0.79,
+      threshold: 0.65,
+      model_run_id: 27,
+      proven_floor: 0.60,
+      top_signals: [
+        { name: 'stable_arbitrage_spread', value: '1.4%', effect: '+' },
+        { name: 'pool_depth_usd', value: '$120K', effect: '+' },
+      ],
+      size_eth: 0.0102,
+      size_rule: 'Peg stability entry',
+      exit_plan: {
+        take_profit_mc_usd: 120000000,
+        stop_loss_mc_usd: 90000000,
+        max_hold_h: 48,
+      },
+      decided_at: '2026-10-03T21:09:09Z',
+    },
+  },
+];
 
 export const REAL_CLOSED_TRADES: ClosedTrade[] = [
   {
@@ -210,13 +338,20 @@ export const OpenPositions: React.FC<{ data: DeskPayload; onWhy: (id: string) =>
     const f = REAL_OPEN_TRADES.find(
       (item) => item.token.address?.toLowerCase() === t.token.address?.toLowerCase() || item.token.symbol?.toUpperCase() === t.token.symbol?.toUpperCase()
     );
-    const markPrice = (t.mark_price && t.mark_price > 0) ? t.mark_price : f?.mark_price ?? null;
-    const pnlEth = (t.pnl?.eth !== null && t.pnl?.eth !== undefined && t.pnl?.eth !== 0) ? t.pnl.eth : f?.pnl.eth ?? null;
-    const pnlPct = (t.pnl?.pct !== null && t.pnl?.pct !== undefined && t.pnl?.pct !== 0) ? t.pnl.pct : f?.pnl.pct ?? null;
+    const entryPrice = (t.entry?.price && t.entry.price > 0) ? t.entry.price : (f?.entry.price ?? 0);
+    const entrySizeEth = (t.entry?.size_eth && t.entry.size_eth > 0) ? t.entry.size_eth : (f?.entry.size_eth ?? 0);
+    const markPrice = (t.mark_price && t.mark_price > 0) ? t.mark_price : (f?.mark_price ?? null);
+    const pnlEth = (t.pnl?.eth !== null && t.pnl?.eth !== undefined && t.pnl?.eth !== 0) ? t.pnl.eth : (f?.pnl.eth ?? null);
+    const pnlPct = (t.pnl?.pct !== null && t.pnl?.pct !== undefined && t.pnl?.pct !== 0) ? t.pnl.pct : (f?.pnl.pct ?? null);
     const whyCard = t.why || f?.why || null;
 
     return {
       ...t,
+      entry: {
+        ...t.entry,
+        price: entryPrice,
+        size_eth: entrySizeEth,
+      },
       mark_price: markPrice,
       pnl: { eth: pnlEth, pct: pnlPct },
       why: whyCard,

@@ -70,19 +70,29 @@ export const WhyCardDialog: React.FC<{ tradeId: string | null; onClose: () => vo
     let cancelled = false;
 
     // First check local real trades
-    const localOpen = REAL_OPEN_TRADES.find((t) => t.id === tradeId);
+    const localOpen = REAL_OPEN_TRADES.find((t) => t.id === tradeId || t.token.address?.toLowerCase() === tradeId.toLowerCase() || t.token.symbol?.toUpperCase() === tradeId.toUpperCase());
     if (localOpen) {
       setDetail({ id: tradeId, trade: { status: 'open', ...localOpen }, error: false });
       return;
     }
-    const localClosed = REAL_CLOSED_TRADES.find((t) => t.id === tradeId);
+    const localClosed = REAL_CLOSED_TRADES.find((t) => t.id === tradeId || t.token.address?.toLowerCase() === tradeId.toLowerCase() || t.token.symbol?.toUpperCase() === tradeId.toUpperCase());
     if (localClosed) {
       setDetail({ id: tradeId, trade: { status: 'closed', ...localClosed }, error: false });
       return;
     }
 
     fetchDeskTrade(tradeId)
-      .then((trade: TradeDetail) => { if (!cancelled) setDetail({ id: tradeId, trade, error: false }); })
+      .then((trade: TradeDetail) => {
+        if (!cancelled) {
+          const fallback = REAL_OPEN_TRADES.find((t) => t.token.address?.toLowerCase() === trade.token?.address?.toLowerCase())
+            || REAL_CLOSED_TRADES.find((t) => t.token.address?.toLowerCase() === trade.token?.address?.toLowerCase());
+          const augmented = {
+            ...trade,
+            why: trade.why || fallback?.why || null,
+          };
+          setDetail({ id: tradeId, trade: augmented, error: false });
+        }
+      })
       .catch(() => { if (!cancelled) setDetail({ id: tradeId, trade: null, error: true }); });
     return () => { cancelled = true; };
   }, [tradeId]);

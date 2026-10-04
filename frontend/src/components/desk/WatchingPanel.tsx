@@ -7,6 +7,7 @@ import {
   EXIT_REASON_LABEL, STAGE_LABEL, ageSince, fmtCount, fmtDateTime, fmtPrice, fmtSignedPct, fmtUsdCompact, tokenLabel,
   type DeskPayload, type DeskToken, type WatchingRow,
 } from './types';
+import { REAL_OPEN_TRADES } from './TradesPanels';
 
 const WATCH_COLS = 'md:grid-cols-[minmax(0,1.7fr)_0.85fr_0.75fr_0.8fr_0.7fr_1.5fr_1fr]';
 
@@ -355,8 +356,12 @@ const tradeLog = (data: DeskPayload): LogEvent[] => {
   const closedList = data.closed && data.closed.length > 0 ? data.closed : [];
 
   for (const t of [...openList, ...closedList]) {
+    const f = REAL_OPEN_TRADES.find(
+      (item) => item.token.address?.toLowerCase() === t.token.address?.toLowerCase() || item.token.symbol?.toUpperCase() === t.token.symbol?.toUpperCase()
+    );
+    const price = (t.entry?.price && t.entry.price > 0) ? t.entry.price : (f?.entry.price ?? 0);
     events.push({ key: `${t.id}-buy`, side: 'BUY', simulated: false, token: t.token, at: t.entry.at,
-      price: `${fmtPrice(t.entry.price)} ETH`, link: t.entry.tx_url });
+      price: `${fmtPrice(price)} ETH`, link: t.entry.tx_url });
   }
   for (const t of closedList) {
     if (t.exit) {

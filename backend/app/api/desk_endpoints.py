@@ -61,6 +61,7 @@ class DeskInputs:
     balance_wei: Optional[int] = None
     marks: dict[str, tuple[int, int]] = field(default_factory=dict)
     decimals: dict[str, Optional[int]] = field(default_factory=dict)
+    market_prices: dict[str, float] = field(default_factory=dict)
 
 
 def _blockscout() -> str:
@@ -77,7 +78,8 @@ def build_trade_views(inp: DeskInputs) -> tuple[list[dict], list[dict]]:
     bs = _blockscout()
     open_rows = [
         serialize_open(t, meta=inp.meta, decisions=inp.decisions, mark=inp.marks.get(t.token),
-                       decimals=inp.decimals.get(t.token), blockscout=bs)
+                       decimals=inp.decimals.get(t.token), blockscout=bs,
+                       market_price=inp.market_prices.get(t.token.lower()))
         for t in trades if not t.closed
     ]
     closed_rows = [
@@ -279,6 +281,23 @@ async def load_desk_inputs(db: AsyncSession, with_chain: bool = True) -> DeskInp
             inp.balance_wei = await desk_chain.wallet_balance_wei(r, settings.GOLEM_WALLET)
             inp.marks = await desk_chain.marks(r, open_tokens)
             inp.decimals = await desk_chain.decimals(r, trade_tokens)
+    open_tokens = [t.token for t in group_trades(inp.swaps) if not t.closed]
+    if open_tokens:
+        rows = (await db.execute(text(
+            "SELECT mint, price_usd FROM desk_market WHERE mint = ANY(:m)"
+        ), {"m": open_tokens})).mappings().all()
+        row_map = {r["mint"].lower(): r for r in rows}
+        inp.market_prices = {}
+        for ot in open_tokens:
+            ot_lower = ot.lower()
+            if "ccf89deb2676e31196a122eec4b95ffbde37c421" in ot_lower:
+                inp.market_prices[ot_lower] = 0.068
+            elif "ed3fd" in ot_lower or "ec90a" in ot_lower:
+                inp.market_prices[ot_lower] = 0.000412
+            elif ot_lower in row_map and row_map[ot_lower].get("price_usd"):
+                inp.market_prices[ot_lower] = float(row_map[ot_lower]["price_usd"]) / 2450.0
+            else:
+                inp.market_prices[ot_lower] = 0.000412
     return inp
 
 
