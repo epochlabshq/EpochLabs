@@ -170,7 +170,28 @@ class Settings(BaseSettings):
     @property
     def desk_excluded_tokens(self) -> frozenset[str]:
         extra = [a.strip() for a in self.DESK_EXCLUDED_TOKENS_EXTRA.split(",") if a.strip()]
-        return frozenset(a.lower() for a in [self.EPOCH_TOKEN_CA, self.EMILE_BANANA_TOKEN_CA, *extra])
+        # Every GoForge launch is Golem's own token: it must never buy or sell it (goforge.launches.json)
+        from app.core.goforge_config import goforge_cas
+        return frozenset(a.lower() for a in [self.EPOCH_TOKEN_CA, self.EMILE_BANANA_TOKEN_CA, *extra]) | goforge_cas()
+
+    # GoForge (launch page). The gate numbers are defaults until the owner confirms them.
+    GOFORGE_WORKER_ENABLED: bool = os.getenv("GOFORGE_WORKER_ENABLED", "true").lower() in ("true", "1", "yes")
+    GOFORGE_WORKER_INTERVAL_SECONDS: int = int(os.getenv("GOFORGE_WORKER_INTERVAL_SECONDS", "60"))
+    # A launch with a locked verdict is refreshed this rarely (keeps the database operation budget small)
+    GOFORGE_SETTLED_INTERVAL_SECONDS: int = int(os.getenv("GOFORGE_SETTLED_INTERVAL_SECONDS", "600"))
+    GOFORGE_HOLDERS_LIST_INTERVAL_SECONDS: int = int(os.getenv("GOFORGE_HOLDERS_LIST_INTERVAL_SECONDS", "300"))
+    GOFORGE_STALE_AFTER_SECONDS: int = int(os.getenv("GOFORGE_STALE_AFTER_SECONDS", "180"))
+    GOFORGE_PUBLIC_URL: str = os.getenv("GOFORGE_PUBLIC_URL", "https://epochlabs.run/goforge")
+    GOFORGE_DEX_CHAIN: str = os.getenv("GOFORGE_DEX_CHAIN", "robinhood")
+    GOFORGE_VERDICT_HOURS: int = int(os.getenv("GOFORGE_VERDICT_HOURS", "48"))
+    GOFORGE_TARGET_MC_USD: float = float(os.getenv("GOFORGE_TARGET_MC_USD", "30000"))
+    GOFORGE_GATE_MIN_TRADES: int = int(os.getenv("GOFORGE_GATE_MIN_TRADES", "30"))
+    GOFORGE_COOLDOWN_DAYS: int = int(os.getenv("GOFORGE_COOLDOWN_DAYS", "7"))
+    # No machine-readable source for "model retrained on entry-time signals" yet: the owner flips this
+    GOFORGE_MODEL_FIX_DONE: bool = os.getenv("GOFORGE_MODEL_FIX_DONE", "false").lower() in ("true", "1", "yes")
+    GOFORGE_LAUNCH_RESERVE_ETH: float = float(os.getenv("GOFORGE_LAUNCH_RESERVE_ETH", "0.5"))
+    # golem_swaps has no gas column: gas is estimated as 2 txs per closed trade at this price (0 = ignore gas)
+    GOFORGE_GAS_ETH_PER_TX: float = float(os.getenv("GOFORGE_GAS_ETH_PER_TX", "0"))
 
     # Twitter / X API v2 Credentials & Auto-Post Settings
     TWITTER_API_KEY: str = os.getenv("TWITTER_API_KEY", "")

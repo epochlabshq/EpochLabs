@@ -290,3 +290,64 @@ DROP TRIGGER IF EXISTS golem_trade_decisions_append_only ON golem_trade_decision
 
 CREATE TRIGGER golem_trade_decisions_append_only BEFORE UPDATE OR DELETE ON golem_trade_decisions
 FOR EACH ROW EXECUTE FUNCTION golem_trade_decisions_guard();
+
+-- GoForge (app/db/goforge_schema.py)
+CREATE TABLE IF NOT EXISTS goforge_launches (
+    id              TEXT PRIMARY KEY,
+    ca              TEXT NOT NULL UNIQUE,
+    name            TEXT,
+    symbol          TEXT,
+    launch_tx       TEXT NOT NULL,
+    launched_at     TIMESTAMPTZ,
+    peak_mc_usd     NUMERIC DEFAULT 0,
+    verdict         TEXT CHECK (verdict IN ('pending','reached_30k','stalled')) DEFAULT 'pending',
+    verdict_at      TIMESTAMPTZ,
+    fees_usd        NUMERIC DEFAULT 0,
+    epc_burned      NUMERIC DEFAULT 0,
+    updated_at      TIMESTAMPTZ,
+    pool_active_at  TIMESTAMPTZ,
+    pair_url        TEXT,
+    decimals        INTEGER,
+    total_supply    NUMERIC,
+    deployer        TEXT,
+    top10_pct       DOUBLE PRECISION,
+    top10_at        TIMESTAMPTZ,
+    last_source_ok_at TIMESTAMPTZ,
+    epc_burned_at   TIMESTAMPTZ
+);
+
+CREATE TABLE IF NOT EXISTS goforge_snapshots (
+    launch_id       TEXT REFERENCES goforge_launches(id),
+    ts              TIMESTAMPTZ NOT NULL,
+    price_usd       NUMERIC,
+    mc_usd          NUMERIC,
+    liquidity_usd   NUMERIC,
+    volume_24h_usd  NUMERIC,
+    holders         INTEGER,
+    PRIMARY KEY (launch_id, ts)
+);
+
+-- Rows are never deleted, a locked verdict is final, identity columns never change once set
+CREATE OR REPLACE FUNCTION goforge_launches_guard() RETURNS TRIGGER AS $$
+BEGIN
+    IF TG_OP = 'DELETE' THEN
+        RAISE EXCEPTION 'goforge_launches rows cannot be deleted';
+    END IF;
+    IF OLD.verdict <> 'pending' AND (NEW.verdict IS DISTINCT FROM OLD.verdict
+                                     OR NEW.verdict_at IS DISTINCT FROM OLD.verdict_at
+                                     OR NEW.peak_mc_usd IS DISTINCT FROM OLD.peak_mc_usd) THEN
+        RAISE EXCEPTION 'goforge verdict is locked';
+    END IF;
+    IF NEW.ca IS DISTINCT FROM OLD.ca OR NEW.launch_tx IS DISTINCT FROM OLD.launch_tx
+       OR (OLD.launched_at IS NOT NULL AND NEW.launched_at IS DISTINCT FROM OLD.launched_at)
+       OR (OLD.pool_active_at IS NOT NULL AND NEW.pool_active_at IS DISTINCT FROM OLD.pool_active_at) THEN
+        RAISE EXCEPTION 'goforge launch identity is immutable';
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS goforge_launches_immutable ON goforge_launches;
+
+CREATE TRIGGER goforge_launches_immutable BEFORE UPDATE OR DELETE ON goforge_launches
+FOR EACH ROW EXECUTE FUNCTION goforge_launches_guard();

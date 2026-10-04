@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { EpochEvent, EpochsPayload } from '@/components/epochs/types';
 import type { ClosedTrade, DeskEvent, DeskPayload, OpenTrade } from '@/components/desk/types';
+import type { GoForgeEvent, GoForgePayload, GoForgeTotals, Launch } from '@/components/goforge/types';
 
 export interface TokenItem {
   mint: string;
@@ -80,6 +81,12 @@ interface EmileState {
   deskVersion: number;
   deskFlashId: string | null;
 
+  // GoForge (/api/goforge). WS goforge_* events patch it in place; `goforgeVersion` bumps to trigger a refetch.
+  goforge: GoForgePayload | null;
+  goforgeError: boolean;
+  goforgeVersion: number;
+  goforgeFlashId: string | null;
+
   // Interactive Simulation state
   simState: {
     n: number;
@@ -100,11 +107,31 @@ interface EmileState {
   requestEpochsRefresh: () => void;
   setDesk: (payload: DeskPayload | null, error?: boolean) => void;
   onDeskEvent: (evt: DeskEvent) => void;
+  setGoForge: (payload: GoForgePayload | null, error?: boolean) => void;
+  onGoForgeEvent: (evt: GoForgeEvent) => void;
   setSimParams: (params: Partial<{ n: number; auc: number; d: number; running: boolean }>) => void;
   resetSim: () => void;
 }
 
 const HUES = [38, 152, 268, 196, 12, 88, 320];
+
+const launchedAtMs = (l: Launch) => (l.launched_at ? new Date(l.launched_at).getTime() : 0);
+
+/** Counters from the launch list. Fees and burn are only known server-side: keep the last totals for those. */
+function recount(launches: Launch[], prev: GoForgeTotals): GoForgeTotals {
+  return {
+    ...prev,
+    launches: launches.length,
+    reached_30k: launches.filter((l) => l.verdict === 'reached_30k').length,
+    stalled: launches.filter((l) => l.verdict === 'stalled').length,
+    pending: launches.filter((l) => l.verdict === 'pending').length,
+  };
+}
+
+function upsertLaunch(g: GoForgePayload, launch: Launch): GoForgePayload {
+  const launches = [launch, ...g.launches.filter((l) => l.id !== launch.id)].sort((a, b) => launchedAtMs(b) - launchedAtMs(a));
+  return { ...g, launches, totals: recount(launches, g.totals) };
+}
 
 export const useEmileStore = create<EmileState>((set, get) => ({
   isConnected: true,
@@ -142,6 +169,11 @@ export const useEmileStore = create<EmileState>((set, get) => ({
   deskError: false,
   deskVersion: 0,
   deskFlashId: null,
+
+  goforge: null,
+  goforgeError: false,
+  goforgeVersion: 0,
+  goforgeFlashId: null,
 
   simState: {
     n: 0,
@@ -232,6 +264,23 @@ export const useEmileStore = create<EmileState>((set, get) => ({
         closed_total: desk.closed.some((t) => t.id === trade.id) ? desk.closed_total : desk.closed_total + 1,
       },
     };
+  }),
+
+  setGoForge: (payload, error = false) => set(payload ? { goforge: payload, goforgeError: false } : { goforgeError: error }),
+
+  onGoForgeEvent: (evt) => set((state) => {
+    const bump = { goforgeVersion: state.goforgeVersion + 1 };
+    const g = state.goforge;
+    if (!g) return bump;
+    if ('goforge_update' in evt) {
+      return { ...bump, goforgeFlashId: evt.goforge_update.id, goforge: upsertLaunch(g, evt.goforge_update) };
+    }
+    if ('goforge_verdict' in evt) {
+      return { ...bump, goforgeFlashId: evt.goforge_verdict.id, goforge: upsertLaunch(g, evt.goforge_verdict.launch) };
+    }
+    const { id, epc_burned } = evt.goforge_burn;
+    const launches = g.launches.map((l) => (l.id === id ? { ...l, epc_burned } : l));
+    return { ...bump, goforgeFlashId: id, goforge: { ...g, launches } };
   }),
 
   setSimParams: (params) => set((state) => ({ simState: { ...state.simState, ...params } })),

@@ -3,6 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { GOFORGE_LIVE } from '@/config/goforgeCopy';
 
 interface HeaderBarProps {
   phaseText?: string;
@@ -17,6 +18,7 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({ phaseText = 'phase 1 · le
     { name: 'The Math', href: '/math' },
     { name: 'Epochs', href: '/epochs' },
     { name: 'Desk', href: '/desk' },
+    { name: 'GoForge', href: '/goforge', soon: !GOFORGE_LIVE },
     // Launches is hidden from the nav for now; the /launches route still works.
     { name: 'About', href: '/about' },
   ];
@@ -68,6 +70,11 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({ phaseText = 'phase 1 · le
               className={`relative px-3.5 py-1.5 text-center rounded-md font-medium min-w-[4.5rem] transition-all duration-200 flex items-center justify-center gap-1.5 ${tabStyle}`}
             >
               <span>{link.name}</span>
+              {'soon' in link && link.soon && (
+                <span className="px-1.5 py-0.2 text-[0.58rem] font-black tracking-widest uppercase rounded font-mono bg-[var(--banana)]/80 text-[var(--panel)]">
+                  SOON
+                </span>
+              )}
               {isLaunches && (
                 <span className={`px-1.5 py-0.2 text-[0.58rem] font-black tracking-widest uppercase rounded font-mono shadow-md ${
                   isActive 

@@ -11,6 +11,7 @@ export function useEmileDatabase() {
   const onEpochEvent = useEmileStore((state) => state.onEpochEvent);
   const requestEpochsRefresh = useEmileStore((state) => state.requestEpochsRefresh);
   const onDeskEvent = useEmileStore((state) => state.onDeskEvent);
+  const onGoForgeEvent = useEmileStore((state) => state.onGoForgeEvent);
 
   useEffect(() => {
     const apiBase = getApiBaseUrl();
@@ -144,6 +145,9 @@ export function useEmileDatabase() {
           if (payload.desk_state || payload.desk_waiting || payload.desk_open || payload.desk_close) {
             onDeskEvent(payload);
           }
+          if (payload.goforge_update || payload.goforge_verdict || payload.goforge_burn) {
+            onGoForgeEvent(payload);
+          }
           if (payload.model) {
             updateModel(payload.model);
             // Epoch I/II progress is read from the same model run: refresh it too
@@ -165,5 +169,5 @@ export function useEmileDatabase() {
     return () => {
       if (socket) socket.close();
     };
-  }, [addToken, updateModel, setSimParams, setConnected, setThresholds, onEpochEvent, requestEpochsRefresh, onDeskEvent]);
+  }, [addToken, updateModel, setSimParams, setConnected, setThresholds, onEpochEvent, requestEpochsRefresh, onDeskEvent, onGoForgeEvent]);
 }

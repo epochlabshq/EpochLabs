@@ -13,6 +13,7 @@ import httpx
 from sqlalchemy import text
 
 from app.core.config import settings
+from app.core.goforge_config import goforge_cas
 
 
 async def sync_wallet_transfers(db) -> int:
@@ -52,6 +53,7 @@ async def sync_wallet_transfers(db) -> int:
             existing = set((await db.execute(text("SELECT lower(tx_hash) FROM golem_swaps"))).scalars().all())
 
             new_count = 0
+            goforge = goforge_cas()
             max_decision_id = (await db.execute(text("SELECT COALESCE(MAX(id), 0) FROM golem_trade_decisions"))).scalar()
 
             for t, side in all_transfers:
@@ -60,6 +62,8 @@ async def sync_wallet_transfers(db) -> int:
                     continue
 
                 token_addr = (t.get("rawContract", {}).get("address") or "").lower()
+                if token_addr in goforge:
+                    continue  # a GoForge launch is never a Golem trade
                 token_sym = t.get("asset") or "TOKEN"
                 block_num = int(t.get("blockNum", "0x0"), 16)
                 ts_str = t.get("metadata", {}).get("blockTimestamp")
