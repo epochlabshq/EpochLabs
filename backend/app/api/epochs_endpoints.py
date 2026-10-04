@@ -17,7 +17,7 @@ router = APIRouter(prefix="/api")
 # Same TTL as /api/state
 _cached_epochs = None
 _cached_epochs_ts = 0.0
-EPOCHS_CACHE_TTL_SECONDS = 15.0
+EPOCHS_CACHE_TTL_SECONDS = 180.0
 
 
 def invalidate_epochs_cache() -> None:

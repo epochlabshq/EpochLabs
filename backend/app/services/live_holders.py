@@ -150,8 +150,11 @@ async def refresh_live_holders(db, logs_r: Optional[ChainReader], transfers_r: O
         "SELECT t.mint, t.launched_at FROM tokens t LEFT JOIN desk_live_holders h ON h.mint = t.mint "
         "WHERE t.status::text = 'pending' AND t.chain = 'robinhood' AND t.mint ~ '^0x[0-9a-fA-F]{40}$' "
         "AND t.launched_at > now() - make_interval(hours => :h) "
+        "AND (h.sampled_at IS NULL OR h.sampled_at < now() - interval '30 minutes') "
         "ORDER BY h.sampled_at NULLS FIRST LIMIT :lim"
     ), {"h": max_age_h, "lim": limit})).all()
+    if not rows:
+        return 0
     code = await has_code(code_r or logs_r or transfers_r, [m for m, _ in rows]) if rows else {}
     sem = asyncio.Semaphore(CONCURRENCY)
 
@@ -162,16 +165,23 @@ async def refresh_live_holders(db, logs_r: Optional[ChainReader], transfers_r: O
     results = await asyncio.gather(*(one(m, at) for m, at in rows if code.get(m)))
     results += [(m, None) for m, _ in rows if not code.get(m)]
     now = datetime.now(timezone.utc)
-    n = 0
-    for mint, res in results:
-        if res is None and code.get(mint):
-            continue  # chain unreadable this time: keep the previous count
-        await db.execute(text(
-            "INSERT INTO desk_live_holders (mint, holders, block, sampled_at, has_code) "
-            "VALUES (:m, :h, :b, :at, :c) ON CONFLICT (mint) DO UPDATE SET holders = EXCLUDED.holders, "
-            "block = EXCLUDED.block, sampled_at = EXCLUDED.sampled_at, has_code = EXCLUDED.has_code"
-        ), {"m": mint, "h": res[0] if res else 0, "b": res[1] if res else 0, "at": now,
-            "c": bool(code.get(mint))})
-        n += 1
-    await db.commit()
-    return n
+    
+    params = [
+        {
+            "m": mint,
+            "h": res[0] if res else 0,
+            "b": res[1] if res else 0,
+            "at": now,
+            "c": bool(code.get(mint)),
+        }
+        for mint, res in results
+        if not (res is None and code.get(mint))
+    ]
+    if params:
+        await db.execute(text("""
+            INSERT INTO desk_live_holders (mint, holders, block, sampled_at, has_code)
+            VALUES (:m, :h, :b, :at, :c) ON CONFLICT (mint) DO UPDATE SET holders = EXCLUDED.holders,
+            block = EXCLUDED.block, sampled_at = EXCLUDED.sampled_at, has_code = EXCLUDED.has_code
+        """), params)
+        await db.commit()
+    return len(params)

@@ -123,7 +123,7 @@ class Settings(BaseSettings):
     # Node limit for eth_getLogs without an address filter is 30,000 blocks
     EPOCH_LOG_CHUNK_BLOCKS: int = int(os.getenv("EPOCH_LOG_CHUNK_BLOCKS", "30000"))
     EPOCH_MAX_CHUNKS_PER_TICK: int = int(os.getenv("EPOCH_MAX_CHUNKS_PER_TICK", "40"))
-    EPOCH_WATCHER_INTERVAL_SECONDS: int = int(os.getenv("EPOCH_WATCHER_INTERVAL_SECONDS", "60"))
+    EPOCH_WATCHER_INTERVAL_SECONDS: int = int(os.getenv("EPOCH_WATCHER_INTERVAL_SECONDS", "120"))
     EPOCH_WATCHER_ENABLED: bool = os.getenv("EPOCH_WATCHER_ENABLED", "true").lower() in ("true", "1", "yes")
 
     UNISWAP_V2_FACTORY: str = os.getenv("UNISWAP_V2_FACTORY", "0x8bceaa40b9acdfaedf85adf4ff01f5ad6517937f")
@@ -163,8 +163,8 @@ class Settings(BaseSettings):
     # Watched tokens whose holder count is recounted onchain per Desk worker cycle (stalest first)
     # Watching shows a token while its live market cap is at or above this (the feed's $10K entry bar)
     DESK_WATCH_MIN_MC_USD: float = float(os.getenv("DESK_WATCH_MIN_MC_USD", "10000"))
-    DESK_HOLDERS_BATCH: int = int(os.getenv("DESK_HOLDERS_BATCH", "40"))
-    DESK_WORKER_INTERVAL_SECONDS: int = int(os.getenv("DESK_WORKER_INTERVAL_SECONDS", "60"))
+    DESK_HOLDERS_BATCH: int = int(os.getenv("DESK_HOLDERS_BATCH", "20"))
+    DESK_WORKER_INTERVAL_SECONDS: int = int(os.getenv("DESK_WORKER_INTERVAL_SECONDS", "90"))
     DESK_WORKER_ENABLED: bool = os.getenv("DESK_WORKER_ENABLED", "true").lower() in ("true", "1", "yes")
 
     @property

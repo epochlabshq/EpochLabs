@@ -68,16 +68,25 @@ async def refresh_market(db, *, max_age_h: int) -> int:
         return 0
     market = await fetch_market(mints)
     now = datetime.now(timezone.utc)
-    for mint in mints:
-        m = market.get(mint.lower())
-        await db.execute(text(
-            "INSERT INTO desk_market (mint, mc_usd, liq_usd, price_usd, pair_url, dex_id, peak_seen_usd, fetched_at) "
-            "VALUES (:mint, :mc, :liq, :price, :url, :dex, :mc, :at) "
-            "ON CONFLICT (mint) DO UPDATE SET mc_usd = EXCLUDED.mc_usd, liq_usd = EXCLUDED.liq_usd, "
-            "price_usd = EXCLUDED.price_usd, pair_url = EXCLUDED.pair_url, dex_id = EXCLUDED.dex_id, "
-            "peak_seen_usd = GREATEST(desk_market.peak_seen_usd, EXCLUDED.peak_seen_usd), fetched_at = EXCLUDED.fetched_at"
-        ), {"mint": mint, "mc": m["mc_usd"] if m else None, "liq": m["liq_usd"] if m else None,
-            "price": m["price_usd"] if m else None, "url": m["pair_url"] if m else None,
-            "dex": m["dex_id"] if m else None, "at": now})
-    await db.commit()
-    return sum(1 for mint in mints if market.get(mint.lower()))
+    params = [
+        {
+            "mint": mint,
+            "mc": market[mint.lower()]["mc_usd"],
+            "liq": market[mint.lower()]["liq_usd"],
+            "price": market[mint.lower()]["price_usd"],
+            "url": market[mint.lower()]["pair_url"],
+            "dex": market[mint.lower()]["dex_id"],
+            "at": now,
+        }
+        for mint in mints if mint.lower() in market
+    ]
+    if params:
+        await db.execute(text("""
+            INSERT INTO desk_market (mint, mc_usd, liq_usd, price_usd, pair_url, dex_id, peak_seen_usd, fetched_at)
+            VALUES (:mint, :mc, :liq, :price, :url, :dex, :mc, :at)
+            ON CONFLICT (mint) DO UPDATE SET mc_usd = EXCLUDED.mc_usd, liq_usd = EXCLUDED.liq_usd,
+            price_usd = EXCLUDED.price_usd, pair_url = EXCLUDED.pair_url, dex_id = EXCLUDED.dex_id,
+            peak_seen_usd = GREATEST(desk_market.peak_seen_usd, EXCLUDED.peak_seen_usd), fetched_at = EXCLUDED.fetched_at
+        """), params)
+        await db.commit()
+    return len(params)

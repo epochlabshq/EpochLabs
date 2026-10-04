@@ -20,11 +20,11 @@ else:
         clean_url, 
         echo=False, 
         future=True,
-        pool_size=5,
-        max_overflow=5,
-        pool_timeout=10,
-        pool_pre_ping=True,
-        pool_recycle=300,
+        pool_size=3,
+        max_overflow=2,
+        pool_timeout=15,
+        pool_pre_ping=False,
+        pool_recycle=600,
         connect_args={
             "ssl": ctx,
             "statement_cache_size": 0
