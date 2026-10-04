@@ -43,20 +43,22 @@ async def refresh_pinned(db) -> int:
             if token not in _launched or at < _launched[token]:
                 _launched[token] = at
     now = datetime.now(timezone.utc)
-    for addr in addrs:
-        m = market.get(addr.lower())
-        if not m:
-            continue
+    params = [
+        {"mint": addr, "mc": market[addr.lower()]["mc_usd"], "liq": market[addr.lower()]["liq_usd"],
+         "price": market[addr.lower()]["price_usd"], "url": market[addr.lower()]["pair_url"],
+         "dex": market[addr.lower()]["dex_id"], "at": now}
+        for addr in addrs if addr.lower() in market
+    ]
+    if params:
         await db.execute(text(
             "INSERT INTO desk_market (mint, mc_usd, liq_usd, price_usd, pair_url, dex_id, peak_seen_usd, fetched_at) "
             "VALUES (:mint, :mc, :liq, :price, :url, :dex, :mc, :at) "
             "ON CONFLICT (mint) DO UPDATE SET mc_usd = EXCLUDED.mc_usd, liq_usd = EXCLUDED.liq_usd, "
             "price_usd = EXCLUDED.price_usd, pair_url = EXCLUDED.pair_url, dex_id = EXCLUDED.dex_id, "
             "peak_seen_usd = GREATEST(desk_market.peak_seen_usd, EXCLUDED.peak_seen_usd), fetched_at = EXCLUDED.fetched_at"
-        ), {"mint": addr, "mc": m["mc_usd"], "liq": m["liq_usd"], "price": m["price_usd"], "url": m["pair_url"],
-            "dex": m["dex_id"], "at": now})
-    await db.commit()
-    return sum(1 for a in addrs if market.get(a.lower()))
+        ), params)
+        await db.commit()
+    return len(params)
 
 
 async def load_pinned_rows(db) -> list[dict]:

@@ -123,7 +123,7 @@ class Settings(BaseSettings):
     # Node limit for eth_getLogs without an address filter is 30,000 blocks
     EPOCH_LOG_CHUNK_BLOCKS: int = int(os.getenv("EPOCH_LOG_CHUNK_BLOCKS", "30000"))
     EPOCH_MAX_CHUNKS_PER_TICK: int = int(os.getenv("EPOCH_MAX_CHUNKS_PER_TICK", "40"))
-    EPOCH_WATCHER_INTERVAL_SECONDS: int = int(os.getenv("EPOCH_WATCHER_INTERVAL_SECONDS", "120"))
+    EPOCH_WATCHER_INTERVAL_SECONDS: int = int(os.getenv("EPOCH_WATCHER_INTERVAL_SECONDS", "900"))
     EPOCH_WATCHER_ENABLED: bool = os.getenv("EPOCH_WATCHER_ENABLED", "true").lower() in ("true", "1", "yes")
 
     UNISWAP_V2_FACTORY: str = os.getenv("UNISWAP_V2_FACTORY", "0x8bceaa40b9acdfaedf85adf4ff01f5ad6517937f")
@@ -137,7 +137,7 @@ class Settings(BaseSettings):
     DESK_MAX_HOLD_H: int = int(os.getenv("DESK_MAX_HOLD_H", "48"))
     DESK_MIN_LIQ_USD: float = float(os.getenv("DESK_MIN_LIQ_USD", "5000"))
     DESK_START_ETH: float = float(os.getenv("DESK_START_ETH", "1.0"))
-    DESK_HEARTBEAT_WARN_SECONDS: int = int(os.getenv("DESK_HEARTBEAT_WARN_SECONDS", "300"))
+    DESK_HEARTBEAT_WARN_SECONDS: int = int(os.getenv("DESK_HEARTBEAT_WARN_SECONDS", "900"))
     DESK_DROPPED_VISIBLE_H: int = int(os.getenv("DESK_DROPPED_VISIBLE_H", "6"))
     DESK_DROPPED_REVEAL_H: int = int(os.getenv("DESK_DROPPED_REVEAL_H", "48"))
     DESK_WATCHING_LIMIT: int = int(os.getenv("DESK_WATCHING_LIMIT", "10"))
@@ -164,7 +164,7 @@ class Settings(BaseSettings):
     # Watching shows a token while its live market cap is at or above this (the feed's $10K entry bar)
     DESK_WATCH_MIN_MC_USD: float = float(os.getenv("DESK_WATCH_MIN_MC_USD", "10000"))
     DESK_HOLDERS_BATCH: int = int(os.getenv("DESK_HOLDERS_BATCH", "20"))
-    DESK_WORKER_INTERVAL_SECONDS: int = int(os.getenv("DESK_WORKER_INTERVAL_SECONDS", "90"))
+    DESK_WORKER_INTERVAL_SECONDS: int = int(os.getenv("DESK_WORKER_INTERVAL_SECONDS", "300"))
     DESK_WORKER_ENABLED: bool = os.getenv("DESK_WORKER_ENABLED", "true").lower() in ("true", "1", "yes")
 
     @property

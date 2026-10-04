@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { getApiBaseUrl } from '@/config/constants';
 import { formatSignedEth, formatTokenAmount, formatUtc, shortAddress, type TradeItem, type TradesPayload } from './types';
 
-const POLL_MS = 60_000;
+const POLL_MS = 300_000;
 
 const SIDE_STYLE: Record<TradeItem['side'], string> = {
   buy: 'text-[var(--live)] border-[var(--live)]/50',

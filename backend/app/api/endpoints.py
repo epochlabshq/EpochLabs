@@ -15,7 +15,7 @@ router = APIRouter(prefix="/api")
 # In-memory response cache for state snapshot (TTL 15 seconds)
 _cached_state_data = None
 _cached_state_timestamp = 0.0
-STATE_CACHE_TTL_SECONDS = 60.0
+STATE_CACHE_TTL_SECONDS = 300.0
 
 
 def invalidate_state_cache() -> None:

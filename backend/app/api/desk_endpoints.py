@@ -24,8 +24,8 @@ from app.services.golem_guard import trade_gate
 
 router = APIRouter(prefix="/api")
 
-CACHE_TTL_SECONDS = 60.0
-STALE_MAX_SECONDS = 300.0
+CACHE_TTL_SECONDS = 300.0
+STALE_MAX_SECONDS = 600.0
 _cache: Optional["DeskInputs"] = None
 _cache_ts = 0.0
 _refreshing = False

@@ -37,6 +37,15 @@ from app.services.desk_wallet_sync import sync_wallet_transfers
 DESK_WORKER_LOCK_KEY = 0x45504F43_4445534B  # "EPOC" "DESK"
 
 _last_waiting_digest: Optional[str] = None
+_last_discovery_ts = 0.0
+_last_holders_ts = 0.0
+_last_scores_ts = 0.0
+_last_pinned_ts = 0.0
+
+DISCOVERY_INTERVAL = 900.0   # 15 minutes
+HOLDERS_INTERVAL = 900.0     # 15 minutes
+SCORES_INTERVAL = 600.0      # 10 minutes
+PINNED_INTERVAL = 600.0      # 10 minutes
 
 
 async def score_watching(db) -> int:
@@ -95,39 +104,51 @@ async def announce_trades(db, inp) -> list[dict]:
 
 
 async def run_desk_cycle() -> None:
-    global _last_waiting_digest
+    global _last_waiting_digest, _last_discovery_ts, _last_holders_ts, _last_scores_ts, _last_pinned_ts
     events: list[dict] = []
+    new_swaps = 0
+    now_ts = time.time()
     async with exclusive(DESK_WORKER_LOCK_KEY) as locked, AsyncSessionLocal() as db:
         if not locked:
             return
         try:
             now = datetime.now(timezone.utc)
-            try:
-                added = await discover_tokens(db)
-                print(f"[DESK WORKER] Discovered {added} new tokens on DexScreener", flush=True)
-            except Exception as e:
-                await db.rollback()
-                print(f"[DESK WORKER] Discovery failed: {type(e).__name__} {e}", flush=True)
-            try:
-                updated = await refresh_live_holders(
-                    db, await desk_chain.log_reader(), await desk_chain.transfers_reader(),
-                    max_age_h=settings.DESK_MAX_HOLD_H, limit=settings.DESK_HOLDERS_BATCH,
-                    code_r=await desk_chain.reader())
-                print(f"[DESK WORKER] Counted holders onchain for {updated} tokens", flush=True)
-            except Exception as e:
-                await db.rollback()
-                print(f"[DESK WORKER] Holder count failed: {type(e).__name__} {e}", flush=True)
+            if now_ts - _last_discovery_ts > DISCOVERY_INTERVAL:
+                _last_discovery_ts = now_ts
+                try:
+                    added = await discover_tokens(db)
+                    print(f"[DESK WORKER] Discovered {added} new tokens on DexScreener", flush=True)
+                except Exception as e:
+                    await db.rollback()
+                    print(f"[DESK WORKER] Discovery failed: {type(e).__name__} {e}", flush=True)
+
+            if now_ts - _last_holders_ts > HOLDERS_INTERVAL:
+                _last_holders_ts = now_ts
+                try:
+                    updated = await refresh_live_holders(
+                        db, await desk_chain.log_reader(), await desk_chain.transfers_reader(),
+                        max_age_h=settings.DESK_MAX_HOLD_H, limit=5,
+                        code_r=await desk_chain.reader())
+                    print(f"[DESK WORKER] Counted holders onchain for {updated} tokens", flush=True)
+                except Exception as e:
+                    await db.rollback()
+                    print(f"[DESK WORKER] Holder count failed: {type(e).__name__} {e}", flush=True)
+
             try:
                 priced = await refresh_market(db, max_age_h=settings.DESK_MAX_HOLD_H)
                 print(f"[DESK WORKER] Live market cap for {priced} tokens", flush=True)
             except Exception as e:
                 await db.rollback()
                 print(f"[DESK WORKER] Market refresh failed: {type(e).__name__} {e}", flush=True)
-            try:
-                await refresh_pinned(db)
-            except Exception as e:
-                await db.rollback()
-                print(f"[DESK WORKER] Pinned refresh failed: {type(e).__name__} {e}", flush=True)
+
+            if now_ts - _last_pinned_ts > PINNED_INTERVAL:
+                _last_pinned_ts = now_ts
+                try:
+                    await refresh_pinned(db)
+                except Exception as e:
+                    await db.rollback()
+                    print(f"[DESK WORKER] Pinned refresh failed: {type(e).__name__} {e}", flush=True)
+
             try:
                 new_swaps = await sync_wallet_transfers(db)
                 if new_swaps > 0:
@@ -135,15 +156,18 @@ async def run_desk_cycle() -> None:
             except Exception as e:
                 await db.rollback()
                 print(f"[DESK WORKER] Wallet sync failed: {type(e).__name__} {e}", flush=True)
-            try:
-                n = await score_watching(db)
-                # A scoring pass over the feed is a decision cycle: that is what the heartbeat reports
-                await db.execute(text("UPDATE desk_state SET last_decision_at = :now WHERE id = 1"), {"now": now})
-                await db.commit()
-                print(f"[DESK WORKER] Scored {n} watched tokens", flush=True)
-            except ScorerUnavailable as e:
-                await db.rollback()
-                print(f"[DESK WORKER] Scoring unavailable: {e}", flush=True)
+
+            if now_ts - _last_scores_ts > SCORES_INTERVAL:
+                _last_scores_ts = now_ts
+                try:
+                    n = await score_watching(db)
+                    # A scoring pass over the feed is a decision cycle: that is what the heartbeat reports
+                    await db.execute(text("UPDATE desk_state SET last_decision_at = :now WHERE id = 1"), {"now": now})
+                    await db.commit()
+                    print(f"[DESK WORKER] Scored {n} watched tokens", flush=True)
+                except ScorerUnavailable as e:
+                    await db.rollback()
+                    print(f"[DESK WORKER] Scoring unavailable: {e}", flush=True)
 
             if settings.DESK_PAPER_ENABLED:
                 try:
@@ -187,7 +211,8 @@ async def run_desk_cycle() -> None:
         finally:
             await db.rollback()
 
-    invalidate_desk_cache()
+    if events or new_swaps > 0:
+        invalidate_desk_cache()
     for ev in events:
         await manager.broadcast(ev)
 

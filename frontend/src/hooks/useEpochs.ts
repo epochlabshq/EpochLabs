@@ -3,8 +3,8 @@ import { useEmileStore } from '@/store/useEmileStore';
 import { getApiBaseUrl } from '@/config/constants';
 import type { EpochsPayload } from '@/components/epochs/types';
 
-// Fallback poll in case the WebSocket drops; the backend caches for 15s and the watcher ticks every 60s.
-const POLL_MS = 60_000;
+// Fallback poll in case the WebSocket drops; live events stream via WebSocket.
+const POLL_MS = 300_000;
 
 export function useEpochs() {
   const setEpochs = useEmileStore((s) => s.setEpochs);

@@ -3,10 +3,10 @@ import { useEmileStore } from '@/store/useEmileStore';
 import { getApiBaseUrl } from '@/config/constants';
 import type { DeskPayload } from '@/components/desk/types';
 
-// Fallback poll in case the WebSocket drops. The backend caches /api/desk for 5s and the worker ticks every 60s.
-const POLL_MS = 30_000;
+// Fallback poll in case the WebSocket drops. Live updates stream via WebSocket /stream.
+const POLL_MS = 120_000;
 // After a WS event the row is patched in place; refetch once the backend cache has expired for the totals
-const AFTER_EVENT_MS = 6_000;
+const AFTER_EVENT_MS = 10_000;
 
 export function useDesk() {
   const setDesk = useEmileStore((s) => s.setDesk);
