@@ -58,7 +58,14 @@ export const NarrativeMap: React.FC<Props> = ({ points, narratives, selectedId, 
       const n = vals.length;
       const order = vals.map((v, i) => [v, i] as const).sort((a, b) => a[0] - b[0]);
       const rank = new Array<number>(n);
-      order.forEach(([, i], r) => { rank[i] = n > 1 ? r / (n - 1) : 0.5; });
+      // Equal values share one (average) rank: identical lore must stay one stack, not be spread into a line
+      for (let s = 0; s < n; ) {
+        let e = s;
+        while (e + 1 < n && order[e + 1][0] === order[s][0]) e++;
+        const r = n > 1 ? (s + e) / 2 / (n - 1) : 0.5;
+        for (let k = s; k <= e; k++) rank[order[k][1]] = r;
+        s = e + 1;
+      }
       const lo = order[Math.floor((n - 1) * 0.01)][0];
       const hi = order[Math.ceil((n - 1) * 0.99)][0];
       return vals.map((v, i) => {
@@ -103,11 +110,20 @@ export const NarrativeMap: React.FC<Props> = ({ points, narratives, selectedId, 
     };
     const fx = fit(tx);
     const fy = fit(ty);
-    return points.map((p, i) => ({
-      px: PAD + fx[i] * (size.w - 2 * PAD),
-      py: size.h - PAD - fy[i] * (size.h - 2 * PAD),
-      p,
-    }));
+    // Tokens with identical lore land on one spot: fan each stack out in a sunflower so every dot stays visible
+    const seen = new Map<string, number>();
+    return points.map((p, i) => {
+      const key = `${p.x}|${p.y}`;
+      const k = seen.get(key) ?? 0;
+      seen.set(key, k + 1);
+      const r = 3.6 * Math.sqrt(k);
+      const a = k * 2.399963;
+      return {
+        px: PAD + fx[i] * (size.w - 2 * PAD) + Math.cos(a) * r,
+        py: size.h - PAD - fy[i] * (size.h - 2 * PAD) + Math.sin(a) * r,
+        p,
+      };
+    });
   }, [points, size]);
 
   // A soft territory per narrative: centroid plus the 80th percentile distance of its points
