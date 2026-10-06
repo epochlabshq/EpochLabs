@@ -130,6 +130,59 @@ async def count_holders(logs_r: Optional[ChainReader], token: str, launched_at: 
     return None
 
 
+MAX_REPLAY_LOGS = 60_000      # a bigger token is skipped rather than replayed (memory and RPC time)
+REPLAY_TIMEOUT_S = 150.0
+
+
+async def count_holders_full(logs_r: Optional[ChainReader], token: str, created_at: datetime,
+                             transfers_r: Optional[ChainReader] = None) -> Optional[tuple[int, int]]:
+    """
+    (holders, block) now, replaying the token's whole life in consecutive windows (count_holders reads only one,
+    about 11.8 days). Balances are folded in as each window arrives, and a token with more than MAX_REPLAY_LOGS
+    transfers, or a replay past REPLAY_TIMEOUT_S, returns None: no number is better than a partial one.
+    """
+    token = token.lower()
+    clock_r = logs_r or transfers_r
+    if clock_r is None:
+        return None
+    try:
+        latest, latest_at, bt = await _clock(clock_r)
+    except Exception as e:
+        print(f"[HOLDERS] block clock unavailable: {type(e).__name__} {e}", flush=True)
+        return None
+    frm = max(0, block_at(created_at, latest, latest_at, bt) - 20_000)  # margin for the clock estimate
+    if latest - frm <= LOOKBACK_BLOCKS:
+        return await count_holders(logs_r, token, created_at, transfers_r=transfers_r)
+    if logs_r is None:
+        return None
+
+    async def replay() -> Optional[tuple[int, int]]:
+        balances: dict[str, int] = {}
+        seen = 0
+        start = frm
+        while start <= latest:
+            end = min(latest, start + LOOKBACK_BLOCKS)
+            for lg in await _logs(logs_r, token, start, end):
+                if not lg.get("topics") or lg["topics"][0] != TOPIC_TRANSFER or len(lg["topics"]) < 3:
+                    continue
+                t = decode_transfer(lg)
+                if t["amount_wei"]:
+                    balances[t["from"]] = balances.get(t["from"], 0) - t["amount_wei"]
+                    balances[t["to"]] = balances.get(t["to"], 0) + t["amount_wei"]
+                seen += 1
+            if seen > MAX_REPLAY_LOGS:
+                print(f"[HOLDERS] {token}: over {MAX_REPLAY_LOGS} transfers, full replay skipped", flush=True)
+                return None
+            start = end + 1
+        return sum(1 for a, b in balances.items() if b > 0 and a not in (ZERO, DEAD)), latest
+
+    try:
+        return await asyncio.wait_for(replay(), REPLAY_TIMEOUT_S)
+    except Exception as e:
+        print(f"[HOLDERS] {token} full replay: {type(e).__name__} {e}", flush=True)
+        return None
+
+
 async def has_code(r: ChainReader, addresses: list[str]) -> dict[str, bool]:
     """Whether a contract exists at each address (small batches: Alchemy's free tier limits compute per second)."""
     out = {}

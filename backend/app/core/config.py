@@ -193,6 +193,25 @@ class Settings(BaseSettings):
     # golem_swaps has no gas column: gas is estimated as 2 txs per closed trade at this price (0 = ignore gas)
     GOFORGE_GAS_ETH_PER_TX: float = float(os.getenv("GOFORGE_GAS_ETH_PER_TX", "0"))
 
+    # Meta Radar (narrative map). One clustering run per day at RADAR_RUN_HOUR_UTC:RADAR_RUN_MINUTE_UTC.
+    RADAR_WORKER_ENABLED: bool = os.getenv("RADAR_WORKER_ENABLED", "true").lower() in ("true", "1", "yes")
+    RADAR_RUN_HOUR_UTC: int = int(os.getenv("RADAR_RUN_HOUR_UTC", "0"))
+    RADAR_RUN_MINUTE_UTC: int = int(os.getenv("RADAR_RUN_MINUTE_UTC", "15"))
+    RADAR_MIN_CLUSTER_SIZE: int = int(os.getenv("RADAR_MIN_CLUSTER_SIZE", "15"))
+    # HDBSCAN noise above this share of tokens falls back to KMeans (k chosen by silhouette in 8..25)
+    RADAR_MAX_NOISE_FRACTION: float = float(os.getenv("RADAR_MAX_NOISE_FRACTION", "0.5"))
+    RADAR_MATCH_MAX_COSINE: float = float(os.getenv("RADAR_MATCH_MAX_COSINE", "0.25"))
+    # Sample-size rules for any percentage shown: below MIN none, below NORMAL "low confidence"
+    RADAR_MIN_RESOLVED: int = int(os.getenv("RADAR_MIN_RESOLVED", "20"))
+    RADAR_NORMAL_RESOLVED: int = int(os.getenv("RADAR_NORMAL_RESOLVED", "50"))
+    # 0 = the whole token history, otherwise only tokens launched within this many days
+    RADAR_HISTORY_DAYS: int = int(os.getenv("RADAR_HISTORY_DAYS", "0"))
+    # A 7d window needs this many resolved tokens before its survival rate is used (trend / saturation)
+    RADAR_MIN_WINDOW_RESOLVED: int = int(os.getenv("RADAR_MIN_WINDOW_RESOLVED", "5"))
+    RADAR_SATURATION_MIN_LAUNCHES: int = int(os.getenv("RADAR_SATURATION_MIN_LAUNCHES", "5"))
+    RADAR_TREND_THRESHOLD_PCT: float = float(os.getenv("RADAR_TREND_THRESHOLD_PCT", "25"))
+    RADAR_EXAMPLE_MIN_AGE_DAYS: int = int(os.getenv("RADAR_EXAMPLE_MIN_AGE_DAYS", "7"))
+
     # Twitter / X API v2 Credentials & Auto-Post Settings
     TWITTER_API_KEY: str = os.getenv("TWITTER_API_KEY", "")
     TWITTER_API_SECRET: str = os.getenv("TWITTER_API_SECRET", "")

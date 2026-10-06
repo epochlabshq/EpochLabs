@@ -18,6 +18,7 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({ phaseText = 'phase 1 · le
     { name: 'Epochs', href: '/epochs' },
     { name: 'Desk', href: '/desk' },
     { name: 'GoForge', href: '/goforge' },
+    { name: 'Radar', href: '/radar' },
     // Launches is hidden from the nav for now; the /launches route still works.
     { name: 'About', href: '/about' },
   ];
@@ -69,7 +70,7 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({ phaseText = 'phase 1 · le
               className={`relative px-3.5 py-1.5 text-center rounded-md font-medium min-w-[4.5rem] transition-all duration-200 flex items-center justify-center gap-1.5 ${tabStyle}`}
             >
               <span>{link.name}</span>
-              {(isLaunches || link.name === 'GoForge') && (
+              {(isLaunches || link.name === 'GoForge' || link.name === 'Radar') && (
                 <span className={`px-1.5 py-0.2 text-[0.58rem] font-black tracking-widest uppercase rounded font-mono shadow-md ${
                   isActive 
                     ? 'bg-[var(--banana)] text-[var(--panel)] animate-pulse'

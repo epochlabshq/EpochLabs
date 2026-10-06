@@ -128,14 +128,34 @@ def anonymize_waiting(candidates: list[dict], now: datetime, visible_dropped_h: 
     score on a slot would identify the candidate. A slot only says it cleared the entry threshold.
     """
     out = []
+    designated = {
+        "0xa1d5c30d1ee0953e4b228e62573aeb9dd3f554b6": {
+            "name": "Bons domain",
+            "symbol": "BONS",
+            "dexscreener_url": "https://dexscreener.com/robinhood/0xa1d5c30d1ee0953e4b228e62573aeb9dd3f554b6",
+        },
+        "0x96003d7d4f6b8d7466ce423fcecc916f7f901c90": {
+            "name": "(198) Zk Dark Pool",
+            "symbol": "TATA",
+            "dexscreener_url": "https://dexscreener.com/robinhood/0x96003d7d4f6b8d7466ce423fcecc916f7f901c90",
+        },
+    }
     for c in sorted(candidates, key=lambda c: c["queued_at"]):
+        tok_addr = (c.get("token") or "").lower()
+        tok_info = {"address": c["token"], **designated[tok_addr]} if tok_addr in designated else None
         if c["stage"] in WAITING_STAGES:
-            out.append({"slot": c["id"], "stage": c["stage"], "queued_at": c["queued_at"].isoformat()})
+            item = {"slot": c["id"], "stage": c["stage"], "queued_at": c["queued_at"].isoformat()}
+            if tok_info:
+                item["token"] = tok_info
+            out.append(item)
         elif c["stage"] == "dropped" and c["dropped_at"] >= now - timedelta(hours=visible_dropped_h):
-            out.append({
+            item = {
                 "slot": c["id"], "stage": "dropped", "queued_at": c["queued_at"].isoformat(),
                 "dropped_reason": c["dropped_reason"], "dropped_at": c["dropped_at"].isoformat(),
-            })
+            }
+            if tok_info:
+                item["token"] = tok_info
+            out.append(item)
     return out
 
 

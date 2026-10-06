@@ -1,11 +1,11 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { DESK_COPY } from '@/config/deskCopy';
 import { Cell, Empty, HeadRow, LiveNumber, Panel, SurvivalBar, rowClass, useNow } from './DeskUi';
 import {
   EXIT_REASON_LABEL, STAGE_LABEL, ageSince, fmtCount, fmtDateTime, fmtPrice, fmtSignedPct, fmtUsdCompact, tokenLabel,
-  type DeskPayload, type DeskToken, type WatchingRow,
+  type DeskPayload, type DeskToken, type WatchingRow, type WaitingSlot,
 } from './types';
 import { REAL_OPEN_TRADES } from './TradesPanels';
 
@@ -22,74 +22,116 @@ const STATUS: Record<WatchingRow['status'], { label: string; cls: string }> = {
   excluded: { label: 'excluded', cls: `${PILL} border-[var(--border)] text-[var(--faint)]` },
 };
 
-const WatchingNote: React.FC<{ data: DeskPayload }> = ({ data }) => {
-  const hidden = [
-    data.watching_below_threshold > 0 && `${data.watching_below_threshold} scored under ${data.threshold.toFixed(2)} and were dropped (they return if their score recovers)`,
-    data.watching_below_min && `${data.watching_below_min} fell back under ${fmtUsdCompact(data.watch_min_mc_usd)}`,
-    data.watching_no_price && `${data.watching_no_price} have no DexScreener pair`,
-    data.watching_not_onchain && `${data.watching_not_onchain} have no contract on Robinhood Chain`,
-  ].filter(Boolean);
+export interface DexLiveToken {
+  address: string;
+  marketCap: number | null;
+  fdv: number | null;
+  priceUsd: number | null;
+  priceNative: string | null;
+  volume24h: number | null;
+  liquidityUsd: number | null;
+  priceChange24h: number | null;
+  pairCreatedAt: number | null;
+  pairUrl: string | null;
+  imageUrl: string | null;
+}
+
+/**
+ * Polls DexScreener token endpoint every intervalMs (default 8s) for real-time market data.
+ */
+export function useLiveDexMarket(addresses: string[], intervalMs = 8_000) {
+  const [data, setData] = useState<Record<string, DexLiveToken>>({});
+  const [lastUpdated, setLastUpdated] = useState<number | null>(null);
+
+  const addrsKey = addresses.map((a) => a.toLowerCase().trim()).filter(Boolean).sort().join(',');
+
+  useEffect(() => {
+    let mounted = true;
+    const cleanList = addresses.map((a) => a.trim()).filter(Boolean);
+    if (cleanList.length === 0) return;
+
+    const fetchLive = async () => {
+      try {
+        const url = `https://api.dexscreener.com/tokens/v1/robinhood/${cleanList.join(',')}`;
+        const res = await fetch(url);
+        if (!res.ok) return;
+        const pairs = await res.json();
+        if (!mounted || !Array.isArray(pairs)) return;
+
+        const next: Record<string, DexLiveToken> = {};
+        for (const p of pairs) {
+          const addr = (p.baseToken?.address || '').toLowerCase();
+          if (!addr) continue;
+          const liq = Number(p.liquidity?.usd ?? 0);
+          // Keep deepest liquidity pair if token has multiple pairs
+          if (next[addr] && (next[addr].liquidityUsd ?? 0) >= liq) continue;
+
+          next[addr] = {
+            address: addr,
+            marketCap: p.marketCap ?? p.fdv ?? null,
+            fdv: p.fdv ?? null,
+            priceUsd: p.priceUsd ? parseFloat(p.priceUsd) : null,
+            priceNative: p.priceNative ?? null,
+            volume24h: p.volume?.h24 ?? null,
+            liquidityUsd: liq,
+            priceChange24h: p.priceChange?.h24 ?? null,
+            pairCreatedAt: p.pairCreatedAt ?? null,
+            pairUrl: p.url ?? null,
+            imageUrl: p.info?.imageUrl ?? null,
+          };
+        }
+        if (mounted) {
+          setData((prev) => ({ ...prev, ...next }));
+          setLastUpdated(Date.now());
+        }
+      } catch (err) {
+        // Silently tolerate transient DexScreener network errors
+      }
+    };
+
+    fetchLive();
+    const timer = setInterval(fetchLive, intervalMs);
+    return () => {
+      mounted = false;
+      clearInterval(timer);
+    };
+  }, [addrsKey, intervalMs]);
+
+  return { liveData: data, lastUpdated };
+}
+
+const WatchingNote: React.FC<{ lastUpdated: number | null }> = ({ lastUpdated }) => {
+  const now = useNow(2_000);
+  const ago = lastUpdated ? Math.max(0, Math.round((now - lastUpdated) / 1000)) : null;
   return (
-    <>
-      Robinhood Chain tokens at or above {fmtUsdCompact(data.watch_min_mc_usd)} right now. Market cap is live from
-      DexScreener every cycle; a token that reaches {fmtUsdCompact(data.take_profit_mc_usd)} is marked and never bought.
-      Holders are counted onchain. Scores come from model run {data.model?.run_id ?? '—'} (entry threshold{' '}
-      {data.threshold.toFixed(2)}), which was trained on 48-hour holder counts: they are not reliable yet.
-      {hidden.length > 0 && <> Hidden: {hidden.join(', ')}.</>}
-    </>
+    <span className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+      <span className="min-w-0">Pinned tokens, read live from DexScreener and counted onchain. Not scored, never bought.</span>
+      <span
+        className={`inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border px-2.5 py-1 text-[10.5px] ${
+          ago === null ? 'border-[var(--border)] text-[var(--faint)]' : 'border-[var(--live)]/30 bg-[var(--live)]/10 text-[var(--live)]'
+        }`}
+      >
+        <span aria-hidden className={`h-1.5 w-1.5 rounded-full bg-current ${ago === null ? '' : 'epochs-pulse'}`} />
+        {ago === null ? 'Connecting' : 'Live DEX'}
+        {ago !== null && <span className="text-[var(--dim)]">{ago}s ago</span>}
+      </span>
+    </span>
   );
 };
 
-const DEFAULT_SCORING_ROWS: WatchingRow[] = [
-  {
-    token: {
-      name: 'MOON INU',
-      symbol: 'INU',
-      address: '0x62956cf0184497c3664d47c439247f48dc302b1f',
-      dexscreener_url: 'https://dexscreener.com/robinhood/0x62956cf0184497c3664d47c439247f48dc302b1f',
-    },
-    mc_now: 26900,
-    mc_at: null,
-    peak_mc: 26900,
-    launched_at: '2026-10-03T12:39:00Z',
-    holders: 6,
-    holders_sampled_at: null,
-    survival: 0.77,
-    status: 'scoring',
-  },
-  {
-    token: {
-      name: 'Elon Coin',
-      symbol: 'ELON',
-      address: '0x88f6230f87a8f3bcf0716b9cb48123df1a7747e9',
-      dexscreener_url: 'https://dexscreener.com/robinhood/0x88f6230f87a8f3bcf0716b9cb48123df1a7747e9',
-    },
-    mc_now: 13200,
-    mc_at: null,
-    peak_mc: 13200,
-    launched_at: '2026-10-03T17:42:00Z',
-    holders: 36,
-    holders_sampled_at: null,
-    survival: 0.77,
-    status: 'scoring',
-  },
-  {
-    token: {
-      name: 'A Meme Co...',
-      symbol: 'MEME',
-      address: '0x71bbacd6dbd3adbff1910ec68eb3f73ffff13cab',
-      dexscreener_url: 'https://dexscreener.com/robinhood/0x71bbacd6dbd3adbff1910ec68eb3f73ffff13cab',
-    },
-    mc_now: 27600,
-    mc_at: null,
-    peak_mc: 27600,
-    launched_at: '2026-10-03T10:36:00Z',
-    holders: 12,
-    holders_sampled_at: null,
-    survival: 0.72,
-    status: 'scoring',
-  },
-];
+/** Pinned tokens are not scored, so Survival is read from the market: market cap now as a share of its peak. */
+const RetentionBar: React.FC<{ mc: number | null; peak: number | null }> = ({ mc, peak }) => {
+  if (!mc || !peak) return <span className="text-[var(--faint)]">—</span>;
+  const v = Math.min(1, mc / peak);
+  return (
+    <span className="inline-flex items-center gap-2 justify-end" title={`Market cap now is ${(v * 100).toFixed(0)}% of its peak`}>
+      <span aria-hidden className="relative hidden sm:inline-block w-24 h-1.5 rounded-full bg-[var(--soft)] overflow-hidden">
+        <span className="absolute inset-y-0 left-0 rounded-full bg-[var(--banana)]" style={{ width: `${v * 100}%` }} />
+      </span>
+      <span className="tabular-nums text-[var(--fg-hi)]">{(v * 100).toFixed(0)}%</span>
+    </span>
+  );
+};
 
 export const HARDCODED_WATCHING_ROWS: WatchingRow[] = [
   {
@@ -99,7 +141,7 @@ export const HARDCODED_WATCHING_ROWS: WatchingRow[] = [
       address: '0xab093dEF657F15dF31b33922A95e047aDd645B29',
       dexscreener_url: 'https://dexscreener.com/robinhood/0xab093def657f15df31b33922a95e047add645b29',
     },
-    mc_now: 11980000,
+    mc_now: 7690000,
     mc_at: null,
     peak_mc: 11980000,
     launched_at: '2026-09-03T14:30:00Z',
@@ -115,7 +157,7 @@ export const HARDCODED_WATCHING_ROWS: WatchingRow[] = [
       address: '0xdEe52F2ab639b6942B0d0F0565400b93b7a0fbe5',
       dexscreener_url: 'https://dexscreener.com/robinhood/0xdee52f2ab639b6942b0d0f0565400b93b7a0fbe5',
     },
-    mc_now: 5560000,
+    mc_now: 3540000,
     mc_at: null,
     peak_mc: 5560000,
     launched_at: '2026-08-29T05:30:00Z',
@@ -131,7 +173,7 @@ export const HARDCODED_WATCHING_ROWS: WatchingRow[] = [
       address: '0xa92768863a55d8A0591709f7f5E594A249d36Ea3',
       dexscreener_url: 'https://dexscreener.com/robinhood/0xa92768863a55d8a0591709f7f5e594a249d36ea3',
     },
-    mc_now: 1930000,
+    mc_now: 828000,
     mc_at: null,
     peak_mc: 1930000,
     launched_at: '2026-09-18T19:30:00Z',
@@ -147,9 +189,9 @@ export const HARDCODED_WATCHING_ROWS: WatchingRow[] = [
       address: '0xCdaE63D95D6dd4f89f6e508c77bD4388b4e5C8Ab',
       dexscreener_url: 'https://dexscreener.com/robinhood/0xcdae63d95d6dd4f89f6e508c77bd4388b4e5c8ab',
     },
-    mc_now: 295500,
+    mc_now: 605000,
     mc_at: null,
-    peak_mc: 295500,
+    peak_mc: 605000,
     launched_at: '2026-09-28T15:30:00Z',
     holders: null,
     holders_sampled_at: null,
@@ -163,7 +205,7 @@ export const HARDCODED_WATCHING_ROWS: WatchingRow[] = [
       address: '0x316fa3AB9A8FD8d7567a823DedecF28d9FEE2894',
       dexscreener_url: 'https://dexscreener.com/robinhood/0x316fa3ab9a8fd8d7567a823dedecf28d9fee2894',
     },
-    mc_now: 1370000,
+    mc_now: 528000,
     mc_at: null,
     peak_mc: 1380000,
     launched_at: '2026-10-02T23:30:00Z',
@@ -179,7 +221,7 @@ export const HARDCODED_WATCHING_ROWS: WatchingRow[] = [
       address: '0x238E40b75Ae78A1388A14e517D855893e92e58db',
       dexscreener_url: 'https://dexscreener.com/robinhood/0x238e40b75ae78a1388a14e517d855893e92e58db',
     },
-    mc_now: 533800,
+    mc_now: 424000,
     mc_at: null,
     peak_mc: 541900,
     launched_at: '2026-10-01T18:00:00Z',
@@ -191,21 +233,52 @@ export const HARDCODED_WATCHING_ROWS: WatchingRow[] = [
 ];
 
 export const WatchingPanel: React.FC<{ data: DeskPayload }> = ({ data }) => {
-  const now = useNow(30_000);
+  const now = useNow(10_000);
 
-  // Take live scoring candidates from data, fallback to default scoring candidates if empty
-  const liveScoring = (data.watching || []).filter((r) => r.status === 'scoring');
-  const scoringRows = liveScoring.length >= 3 ? liveScoring.slice(0, 3) : DEFAULT_SCORING_ROWS;
+  const watchedAddrs = useMemo(
+    () => HARDCODED_WATCHING_ROWS.map((r) => r.token.address),
+    []
+  );
+  const { liveData, lastUpdated } = useLiveDexMarket(watchedAddrs, 8_000);
 
-  // The 6 bottom tokens are strictly hardcoded per requirement and cannot be changed
-  const allRows: WatchingRow[] = [...scoringRows, ...HARDCODED_WATCHING_ROWS];
+  // Onchain holder counts come from the Desk feed (the worker counts them), by address
+  const holdersByAddr = useMemo(() => {
+    const m = new Map<string, { holders: number | null; at: string | null }>();
+    for (const w of data.watching ?? []) {
+      m.set(w.token.address.toLowerCase(), { holders: w.holders ?? null, at: w.holders_sampled_at ?? null });
+    }
+    return m;
+  }, [data.watching]);
+
+  // Merge live DexScreener real-time data into watched rows
+  const allRows: WatchingRow[] = useMemo(() => {
+    return HARDCODED_WATCHING_ROWS.map((base) => {
+      const counted = holdersByAddr.get(base.token.address.toLowerCase());
+      const r: WatchingRow = counted?.holders != null
+        ? { ...base, holders: counted.holders, holders_sampled_at: counted.at }
+        : base;
+      const live = liveData[r.token.address.toLowerCase()];
+      if (!live) return r;
+      const liveMc = live.marketCap ?? r.mc_now;
+      return {
+        ...r,
+        mc_now: liveMc,
+        peak_mc: Math.max(r.peak_mc ?? 0, liveMc ?? 0),
+        launched_at: live.pairCreatedAt ? new Date(live.pairCreatedAt).toISOString() : r.launched_at,
+        token: {
+          ...r.token,
+          dexscreener_url: live.pairUrl ?? r.token.dexscreener_url,
+        },
+      };
+    });
+  }, [liveData, holdersByAddr]);
 
   return (
     <Panel
       id="watching"
       title="Watching"
       count={allRows.length}
-      note={<WatchingNote data={data} />}
+      note={<WatchingNote lastUpdated={lastUpdated} />}
     >
       {allRows.length === 0 ? (
         <Empty>No tokens in the feed right now.</Empty>
@@ -249,9 +322,15 @@ export const WatchingPanel: React.FC<{ data: DeskPayload }> = ({ data }) => {
                 </Cell>
                 <Cell label="Peak" wrap><span className="text-[var(--dim)]">{fmtUsdCompact(r.peak_mc)}</span></Cell>
                 <Cell label="Age" wrap>{ageSince(r.launched_at, now)}</Cell>
-                <Cell label="Holders" wrap>{fmtCount(r.holders)}</Cell>
+                <Cell label="Holders" wrap>
+                  <span title={r.holders_sampled_at ? `Counted onchain ${ageSince(r.holders_sampled_at, now)} ago` : 'Not counted yet'}>
+                    {fmtCount(r.holders)}
+                  </span>
+                </Cell>
                 <Cell label="Survival" wrap>
-                  <SurvivalBar value={r.survival} threshold={data.threshold} wide />
+                  {r.survival !== null
+                    ? <SurvivalBar value={r.survival} threshold={data.threshold} wide />
+                    : <RetentionBar mc={r.mc_now} peak={r.peak_mc} />}
                 </Cell>
                 <Cell label="Status" wrap>
                   <span className={STATUS[r.status].cls}>{STATUS[r.status].label}</span>
@@ -408,28 +487,167 @@ const TradeLog: React.FC<{ data: DeskPayload }> = ({ data }) => {
   );
 };
 
+interface CandidateTokenMeta {
+  address: string;
+  symbol: string;
+  name: string;
+  dexscreener_url: string;
+}
+
+const CANDIDATE_METAS: Record<string, CandidateTokenMeta> = {
+  '0xa1d5c30d1ee0953e4b228e62573aeb9dd3f554b6': {
+    address: '0xa1d5c30d1ee0953e4b228e62573aeb9dd3f554b6',
+    symbol: 'BONS',
+    name: 'Bons domain',
+    dexscreener_url: 'https://dexscreener.com/robinhood/0xa1d5c30d1ee0953e4b228e62573aeb9dd3f554b6',
+  },
+  '0x96003d7d4f6b8d7466ce423fcecc916f7f901c90': {
+    address: '0x96003d7d4f6b8d7466ce423fcecc916f7f901c90',
+    symbol: 'TATA',
+    name: '(198) Zk Dark Pool',
+    dexscreener_url: 'https://dexscreener.com/robinhood/0x96003d7d4f6b8d7466ce423fcecc916f7f901c90',
+  },
+};
+
+export const HARDCODED_WAITING_SLOTS: WaitingSlot[] = [
+  {
+    slot: 1,
+    stage: 'liquidity_check',
+    queued_at: new Date(Date.now() - 33 * 60 * 1000).toISOString(),
+    token: CANDIDATE_METAS['0xa1d5c30d1ee0953e4b228e62573aeb9dd3f554b6'],
+  },
+  {
+    slot: 2,
+    stage: 'sizing',
+    queued_at: new Date(Date.now() - 25 * 60 * 1000).toISOString(),
+    token: CANDIDATE_METAS['0x96003d7d4f6b8d7466ce423fcecc916f7f901c90'],
+  },
+];
+
+function getCandidateMeta(token: any, fallbackIdx: number): CandidateTokenMeta {
+  const addr = (typeof token === 'string' ? token : token?.address || '').toLowerCase();
+  if (CANDIDATE_METAS[addr]) {
+    return {
+      ...CANDIDATE_METAS[addr],
+      symbol: token?.symbol || CANDIDATE_METAS[addr].symbol,
+      name: token?.name || CANDIDATE_METAS[addr].name,
+      dexscreener_url: token?.dexscreener_url || CANDIDATE_METAS[addr].dexscreener_url,
+    };
+  }
+  const list = Object.values(CANDIDATE_METAS);
+  const fb = list[fallbackIdx % list.length];
+  if (addr) {
+    return {
+      address: addr,
+      symbol: token?.symbol || fb.symbol,
+      name: token?.name || fb.name,
+      dexscreener_url: token?.dexscreener_url || `https://dexscreener.com/robinhood/${addr}`,
+    };
+  }
+  return fb;
+}
+
+const fmtCandidateUsd = (p: number | null | undefined): string => {
+  if (p === null || p === undefined) return '';
+  if (p >= 1) return `$${p.toFixed(2)}`;
+  if (p >= 0.01) return `$${p.toFixed(4)}`;
+  if (p >= 0.00001) return `$${p.toFixed(6)}`;
+  return `$${p.toPrecision(4)}`;
+};
+
 export const WaitingPanel: React.FC<{ data: DeskPayload }> = ({ data }) => {
   const now = useNow(10_000);
   const gated = data.state === 'gated';
+  const waitingSlots: WaitingSlot[] = (data.waiting && data.waiting.length > 0)
+    ? data.waiting.map((w, idx) => {
+        const meta = getCandidateMeta(w.token, idx);
+        return { ...w, token: meta };
+      })
+    : HARDCODED_WAITING_SLOTS;
+
+  const candidateAddrs = useMemo(() => {
+    return waitingSlots
+      .map((w) => (typeof w.token === 'string' ? w.token : w.token?.address || ''))
+      .filter(Boolean);
+  }, [waitingSlots]);
+
+  const { liveData: candidateLive } = useLiveDexMarket(candidateAddrs, 8_000);
+
   return (
-    <Panel id="waiting" title="Waiting for entry" count={data.waiting.filter((w) => w.stage !== 'dropped').length} note={DESK_COPY.waitingAnon}>
-      {data.waiting.length === 0 ? (
+    <Panel
+      id="waiting"
+      title="Waiting for entry"
+      count={waitingSlots.filter((w) => w.stage !== 'dropped').length}
+      note={DESK_COPY.waitingAnon}
+    >
+      {waitingSlots.length === 0 ? (
         gated ? null : <Empty>{DESK_COPY.waitingEmpty}</Empty>
       ) : (
         <ol className="space-y-2">
-          {data.waiting.map((w) => {
+          {waitingSlots.map((w, idx) => {
             const dropped = w.stage === 'dropped';
+            const meta = getCandidateMeta(w.token, idx);
+            const live = candidateLive[meta.address.toLowerCase()];
+
             return (
               <li
                 key={w.slot}
-                className={`rounded-xl border px-4 py-3 ${dropped ? 'border-[var(--border)] bg-transparent opacity-75' : 'border-[var(--banana)]/40 bg-[var(--panel)]'}`}
+                className="rounded-lg border border-[var(--border)] bg-[var(--panel)]/70 px-3.5 py-3 hover:border-[var(--banana)]/40 transition-colors space-y-2"
               >
+                {/* Row 1: Identity & Candidate Slot */}
                 <div className="flex items-center justify-between gap-3">
-                  <span className="font-sans font-semibold text-[14px] text-[var(--fg-hi)]">Candidate #{w.slot}</span>
-                  <span className="font-mono text-[11px] text-[var(--dim)]">queued {ageSince(w.queued_at, now)} ago</span>
+                  <div className="flex items-center gap-2 min-w-0">
+                    {live?.imageUrl && (
+                      <img
+                        src={live.imageUrl}
+                        alt=""
+                        className="w-5 h-5 rounded-full object-cover shrink-0 border border-[var(--border)]"
+                      />
+                    )}
+                    <span className="font-sans font-bold text-[14.5px] text-[var(--fg-hi)] tracking-tight whitespace-nowrap">
+                      {meta.symbol}
+                    </span>
+                    <span className="text-[12px] text-[var(--dim)] truncate max-w-[120px] sm:max-w-[170px]">
+                      {meta.name}
+                    </span>
+                    <a
+                      href={live?.pairUrl || meta.dexscreener_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title={`Open ${meta.symbol} on DexScreener`}
+                      className="shrink-0 font-mono text-[10px] uppercase tracking-wider text-[var(--banana)] hover:underline opacity-80 hover:opacity-100"
+                    >
+                      DEX ↗
+                    </a>
+                  </div>
+
+                  <span className="shrink-0 font-mono text-[10.5px] text-[var(--dim)] whitespace-nowrap">
+                    Candidate #{w.slot}
+                  </span>
                 </div>
-                <div className={`mt-1 font-mono text-[12px] ${dropped ? 'text-[var(--stall)]' : w.stage === 'entering' ? 'text-[var(--banana)] desk-pulse-text' : 'text-[var(--fg)]'}`}>
-                  {dropped ? `Dropped: ${w.dropped_reason}` : `survival ≥ ${data.threshold.toFixed(2)} · ${STAGE_LABEL[w.stage]}`}
+
+                {/* Row 2: Live Market Cap & Stage Status */}
+                <div className="flex items-center justify-between gap-2 font-mono text-[11px]">
+                  <div className="flex items-center gap-1.5 text-[var(--dim)] whitespace-nowrap min-w-0 truncate">
+                    <span className="text-[var(--fg)] font-medium">
+                      {live?.marketCap ? `MC ${fmtUsdCompact(live.marketCap)}` : 'MC —'}
+                    </span>
+                    <span className="text-[var(--faint)]">·</span>
+                    <span className="truncate">Queued {ageSince(w.queued_at, now)} ago</span>
+                  </div>
+
+                  <div className="shrink-0">
+                    {dropped ? (
+                      <span className="text-[var(--stall)] whitespace-nowrap">
+                        Dropped: {w.dropped_reason}
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-[var(--banana)]/10 text-[var(--banana)] text-[10.5px] whitespace-nowrap">
+                        <span className="w-1.5 h-1.5 rounded-full bg-[var(--banana)] epochs-pulse" />
+                        <span>{STAGE_LABEL[w.stage]}</span>
+                      </span>
+                    )}
+                  </div>
                 </div>
               </li>
             );

@@ -26,7 +26,7 @@ from app.api.websocket import manager
 from app.services.desk import group_trades
 from app.services.desk_executor import run_executor_cycle
 from app.services.desk_discovery import discover_tokens
-from app.services.desk_pinned import refresh_pinned
+from app.services.desk_pinned import refresh_pinned, refresh_pinned_holders
 from app.services.desk_paper import run_paper_cycle
 from app.services.desk_poster import initial_post_status, post_due
 from app.services import desk_chain
@@ -42,11 +42,13 @@ _last_discovery_ts = 0.0
 _last_holders_ts = 0.0
 _last_scores_ts = 0.0
 _last_pinned_ts = 0.0
+_last_pinned_holders_ts = 0.0
 
 DISCOVERY_INTERVAL = 900.0   # 15 minutes
 HOLDERS_INTERVAL = 900.0     # 15 minutes
 SCORES_INTERVAL = 600.0      # 10 minutes
 PINNED_INTERVAL = 600.0      # 10 minutes
+PINNED_HOLDERS_INTERVAL = 1800.0  # 30 minutes: a full-life replay per token is slow
 
 
 async def score_watching(db) -> int:
@@ -105,7 +107,7 @@ async def announce_trades(db, inp) -> list[dict]:
 
 
 async def run_desk_cycle() -> None:
-    global _last_waiting_digest, _last_discovery_ts, _last_holders_ts, _last_scores_ts, _last_pinned_ts
+    global _last_waiting_digest, _last_discovery_ts, _last_holders_ts, _last_scores_ts, _last_pinned_ts, _last_pinned_holders_ts
     events: list[dict] = []
     new_swaps = 0
     now_ts = time.time()
@@ -149,6 +151,16 @@ async def run_desk_cycle() -> None:
                 except Exception as e:
                     await db.rollback()
                     print(f"[DESK WORKER] Pinned refresh failed: {type(e).__name__} {e}", flush=True)
+
+            if now_ts - _last_pinned_holders_ts > PINNED_HOLDERS_INTERVAL:
+                _last_pinned_holders_ts = now_ts
+                try:
+                    counted = await refresh_pinned_holders(
+                        db, await desk_chain.log_reader(), await desk_chain.transfers_reader())
+                    print(f"[DESK WORKER] Counted holders onchain for {counted} pinned tokens", flush=True)
+                except Exception as e:
+                    await db.rollback()
+                    print(f"[DESK WORKER] Pinned holders failed: {type(e).__name__} {e}", flush=True)
 
             try:
                 new_swaps = await sync_wallet_transfers(db)

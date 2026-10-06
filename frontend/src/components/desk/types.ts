@@ -33,6 +33,12 @@ export interface WaitingSlot {
   queued_at: string;
   dropped_reason?: string;
   dropped_at?: string;
+  token?: {
+    address: string;
+    name?: string;
+    symbol?: string;
+    dexscreener_url?: string;
+  } | string;
 }
 
 export interface Signal {

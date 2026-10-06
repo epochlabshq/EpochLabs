@@ -13,6 +13,7 @@ from app.api.epochs_endpoints import router as epochs_router
 from app.api.trades_endpoints import router as trades_router
 from app.api.desk_endpoints import router as desk_router
 from app.api.goforge_endpoints import router as goforge_router
+from app.api.radar_endpoints import router as radar_router
 
 from contextlib import asynccontextmanager
 
@@ -44,6 +45,11 @@ async def lifespan(app: FastAPI):
         asyncio.create_task(start_goforge_worker_loop())
     except Exception as e:
         print(f"[MAIN] Warning: Failed to start goforge worker loop: {e}")
+    try:
+        from app.services.radar_worker import start_radar_worker_loop
+        asyncio.create_task(start_radar_worker_loop())
+    except Exception as e:
+        print(f"[MAIN] Warning: Failed to start radar worker loop: {e}")
     try:
         from app.services.twitter_service import start_twitter_scheduler_loop
         asyncio.create_task(start_twitter_scheduler_loop())
@@ -84,6 +90,7 @@ app.include_router(epochs_router)
 app.include_router(trades_router)
 app.include_router(desk_router)
 app.include_router(goforge_router)
+app.include_router(radar_router)
 
 @app.get("/")
 async def root():

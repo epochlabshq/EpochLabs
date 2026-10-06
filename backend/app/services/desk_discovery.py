@@ -54,36 +54,5 @@ def qualifying(pairs: list[dict], now: datetime, *, min_mc: float, max_mc: float
 
 
 async def discover_tokens(db) -> int:
-    """Insert qualifying tokens that are not in the database yet. Returns how many were added."""
-    now = datetime.now(timezone.utc)
-    pairs: list[dict] = []
-    async with httpx.AsyncClient(timeout=20.0) as client:
-        async def search(q: str) -> list[dict]:
-            try:
-                res = await client.get(SEARCH_URL, params={"q": q})
-                res.raise_for_status()
-                return res.json().get("pairs") or []
-            except Exception as e:
-                print(f"[DESK DISCOVERY] query {q!r} failed: {type(e).__name__}", flush=True)
-                return []
-
-        for i in range(0, len(QUERIES), 8):  # small parallel batches stay well under DexScreener's rate limit
-            for found_pairs in await asyncio.gather(*(search(q) for q in QUERIES[i:i + 8])):
-                pairs += found_pairs
-    found = qualifying(pairs, now, min_mc=settings.DESK_WATCH_MIN_MC_USD, max_mc=settings.DESK_TP_MC_USD,
-                       min_liq=settings.DESK_MIN_LIQ_USD, max_age_h=settings.DESK_MAX_HOLD_H,
-                       excluded=settings.desk_excluded_tokens)
-    added = 0
-    for t in found.values():
-        res = await db.execute(text(
-            "INSERT INTO tokens (mint, chain, name, symbol, lore_withheld, image_url, launched_at, peak_mc, "
-            "last_seen_mc, crossed_10k_at, status, poll_count, emile_launched) "
-            "VALUES (:mint, 'robinhood', :name, :symbol, FALSE, :img, :at, :mc, :mc, :now, "
-            "'pending'::token_status, 1, FALSE) "
-            "ON CONFLICT (mint) DO NOTHING RETURNING mint"
-        ), {"mint": t["mint"], "name": t["name"], "symbol": t["symbol"], "img": t["image_url"],
-            "at": t["launched_at"], "mc": t["mc_usd"], "now": now})
-        if res.first():
-            added += 1
-    await db.commit()
-    return added
+    """Token searching in Watching disabled: all tokens are hardcoded."""
+    return 0

@@ -125,10 +125,8 @@ def build_desk_payload(inp: DeskInputs, now: datetime) -> dict:
             "usd": None,  # no onchain EPC/USD source yet
             "burn_address": _addr(burn) if burn else None,
         },
-        # Scored candidates first (capped), then the pinned tokens at the bottom
-        "watching": watching_rows(inp.watching_tokens, settings.DESK_ENTRY_THRESHOLD,
-                                  settings.desk_excluded_tokens, settings.DESK_WATCHING_LIMIT,
-                                  take_profit_mc_usd=settings.DESK_TP_MC_USD) + pinned_watching_rows(inp.pinned),
+        # Watching rows: pinned tokens only
+        "watching": pinned_watching_rows(inp.pinned),
         "watching_not_onchain": inp.watching_not_onchain,
         "watching_no_price": inp.watching_no_price,
         "watching_below_min": inp.watching_below_min,
@@ -241,7 +239,7 @@ async def load_desk_inputs(db: AsyncSession, with_chain: bool = True) -> DeskInp
     ), {"b": settings.EPC_BURN_ADDRESS.lower()})).scalar()
 
     trade_tokens = sorted({(s["token"] or "").lower() for s in swaps if s["token"]})
-    meta_tokens = trade_tokens + [r["token"].lower() for r in revealed]
+    meta_tokens = trade_tokens + [r["token"].lower() for r in revealed] + [c["token"].lower() for c in candidates]
     meta_rows = (await db.execute(text(
         "SELECT lower(mint) AS mint, name, symbol, status::text AS status FROM tokens WHERE lower(mint) = ANY(:m)"
     ), {"m": meta_tokens})).mappings().all() if meta_tokens else []
@@ -260,10 +258,10 @@ async def load_desk_inputs(db: AsyncSession, with_chain: bool = True) -> DeskInp
                    for d in decisions},
         meta={m["mint"]: {"name": m["name"], "symbol": m["symbol"], "status": m["status"]} for m in meta_rows},
         burned_wei=int(burned or 0),
-        watching_not_onchain=int(not_onchain or 0),
-        watching_no_price=int(hidden["no_price"] or 0),
-        watching_below_min=int(hidden["below_min"] or 0),
-        watching_below_threshold=int(below_threshold or 0),
+        watching_not_onchain=0,
+        watching_no_price=0,
+        watching_below_min=0,
+        watching_below_threshold=0,
     )
     inp.pinned = await load_pinned_rows(db)
     if settings.DESK_PAPER_ENABLED:
