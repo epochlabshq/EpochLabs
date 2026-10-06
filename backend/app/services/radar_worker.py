@@ -21,9 +21,11 @@ from app.db.database import AsyncSessionLocal
 from app.db.locks import exclusive
 from app.db.radar_schema import ensure_radar_schema
 from app.services.radar import PrevCluster, RadarParams, RunResult, build_run
+from app.services.radar_status import set_status
 
 RADAR_WORKER_LOCK_KEY = 0x45504F43_52414452  # "EPOC" "RADR"
 RETRY_AFTER_FAILURE_SECONDS = 3600
+EMBED_TIMEOUT_S = 900.0  # model download plus embedding; past this the run fails instead of hanging
 
 
 def last_scheduled(now: datetime, hour: int, minute: int) -> datetime:
@@ -118,18 +120,20 @@ async def run_radar_cycle(force: bool = False) -> Optional[dict]:
     """One clustering run. Returns the stored run row, or None when skipped."""
     async with exclusive(RADAR_WORKER_LOCK_KEY) as locked, AsyncSessionLocal() as db:
         if not locked:
-            print("[RADAR WORKER] Another instance holds the lock. Skipping.")
+            set_status("waiting", "another instance holds the lock")
             return None
         try:
             await ensure_radar_schema(db)
             now = datetime.now(timezone.utc)
             latest = (await db.execute(text("SELECT MAX(run_at) FROM radar_runs"))).scalar()
             if not force and not needs_run(now, latest, settings.RADAR_RUN_HOUR_UTC, settings.RADAR_RUN_MINUTE_UTC):
+                set_status("idle", f"today's run exists (last {latest:%Y-%m-%d %H:%M} UTC)")
                 return None
+            set_status("running", "loading tokens")
 
             df, n_lore_missing = await _load_tokens(db)
             if df.empty:
-                print("[RADAR WORKER] No tokens with lore yet. Skipping.")
+                set_status("skipped", "no tokens with lore yet")
                 return None
             rid = f"radar_{now:%Y-%m-%d}"
             prev_rows = (await db.execute(text(
@@ -142,23 +146,29 @@ async def run_radar_cycle(force: bool = False) -> Optional[dict]:
                 "WHERE cluster_id ~ '^c_[0-9]+$'"))).scalar()
             await db.rollback()  # nothing below needs the read transaction while the CPU-heavy part runs
 
-            embedded = await asyncio.to_thread(_embed, df["lore"].astype(str).tolist())
+            set_status("running", f"embedding {len(df)} lore texts (the first run downloads the model)")
+            embedded = await asyncio.wait_for(
+                asyncio.to_thread(_embed, df["lore"].astype(str).tolist()), EMBED_TIMEOUT_S)
             if embedded is None:
-                print("[RADAR WORKER] No embedder installed (sentence-transformers or fastembed): run skipped, "
-                      "no clusters are made from empty vectors.", flush=True)
+                set_status("skipped", "no embedder installed (sentence-transformers or fastembed), "
+                                      "no clusters are made from empty vectors")
                 return None
             embeddings, embedder = embedded
+            set_status("running", f"clustering {len(df)} tokens ({embedder})")
             df["launched_at"] = pd.to_datetime(df["launched_at"], utc=True)
             result = await asyncio.to_thread(
                 build_run, df, embeddings, prev, int(max_id or 0) + 1, now, RadarParams.from_settings(),
                 n_lore_missing=n_lore_missing, embedder=embedder)
+            set_status("running", "saving")
             await _persist(db, result)
-        except Exception:
+        except Exception as e:
             await db.rollback()
+            set_status("failed", f"{type(e).__name__}: {e}")
             raise
 
     invalidate_radar_cache()
     r = result.run
+    set_status("ok", f"{r['run_id']}: {len(result.clusters)} narratives from {r['n_tokens']} tokens")
     print(f"[RADAR WORKER] Saved {r['run_id']}: tokens={r['n_tokens']} resolved={r['n_resolved']} "
           f"method={r['method']} projection={r['params_json']['projection']} clusters={len(result.clusters)}")
     return r
@@ -166,10 +176,10 @@ async def run_radar_cycle(force: bool = False) -> Optional[dict]:
 
 async def start_radar_worker_loop():
     if not settings.RADAR_WORKER_ENABLED:
-        print("[RADAR WORKER] Disabled via RADAR_WORKER_ENABLED.")
+        set_status("disabled", "RADAR_WORKER_ENABLED is off")
         return
     h, m = settings.RADAR_RUN_HOUR_UTC, settings.RADAR_RUN_MINUTE_UTC
-    print(f"[RADAR WORKER] Started (daily at {h:02d}:{m:02d} UTC).")
+    set_status("waiting", f"started, first check in 90s (daily at {h:02d}:{m:02d} UTC)")
     await asyncio.sleep(90)  # let startup settle: the first run loads the embedder
     while True:
         wait = seconds_until_next(datetime.now(timezone.utc), h, m)

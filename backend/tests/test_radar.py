@@ -473,6 +473,25 @@ class EndpointTests(unittest.TestCase):
              "launched_at": NOW - timedelta(days=30)} for i in range(12)]
         self.assertEqual(len(self.client.get("/api/radar/c_001/examples").json()["examples"]), 5)
 
+    def test_status_endpoint_reports_worker_and_embedders(self):
+        from app.services.radar_status import set_status
+        set_status("skipped", "no embedder installed")
+        r = self.client.get("/api/radar/status")
+        self.assertEqual(r.status_code, 200)
+        body = r.json()
+        self.assertEqual(body["state"], "skipped")
+        self.assertIn("no embedder", body["detail"])
+        self.assertEqual(set(body["embedders"]), {"sentence_transformers", "fastembed"})
+        self.assertIsNotNone(body["at"])
+
+    def test_status_is_not_mistaken_for_a_narrative(self):
+        self.assertEqual(self.client.get("/api/radar/status").json()["embedders"].keys() >= {"fastembed"}, True)
+
+    def test_status_detail_is_one_short_line(self):
+        from app.services.radar_status import set_status, snapshot
+        set_status("failed", "X" * 500)
+        self.assertLessEqual(len(snapshot()["detail"]), 200)
+
     def test_no_run_yet_is_a_404_not_an_empty_success(self):
         self.db.tables["FROM radar_runs"] = []
         self.assertEqual(self.client.get("/api/radar").status_code, 404)
