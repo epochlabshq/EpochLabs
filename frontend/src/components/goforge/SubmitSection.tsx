@@ -240,11 +240,7 @@ export const SubmitSection: React.FC<Props> = ({ round, busy, actionErrors, conn
                 </Field>
               </div>
 
-              {free ? (
-                <p data-testid="fee-free" className="mt-5 rounded-xl border border-[var(--border)] bg-[var(--panel2)] px-4 py-3 text-[13px] text-[var(--dim)]">
-                  Submitting is <span className="text-[var(--fg-hi)]">free</span>. There is no fee to burn.
-                </p>
-              ) : (
+              {!free && (
               <div className="mt-5 rounded-xl border border-[var(--border)] bg-[var(--panel2)] p-4">
                 <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-[var(--faint)]">Submit fee</div>
                 <p className="mt-1 text-[13px] text-[var(--dim)] leading-relaxed">

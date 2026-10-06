@@ -1,5 +1,5 @@
 import React from 'react';
-import { MODERATION_RULES, TEAM_RULE } from '@/config/goforgeCopy';
+import { moderationRules, TEAM_RULE } from '@/config/goforgeCopy';
 import type { RoundPayload } from './types';
 
 const pad = (h: number) => `${String(h).padStart(2, '0')}:00`;
@@ -22,6 +22,7 @@ const Row: React.FC<{ k: string; v: React.ReactNode }> = ({ k, v }) => (
 export const HowItWorks: React.FC<{ round: RoundPayload | null }> = ({ round }) => {
   const r = round?.rules;
   const s = round?.schedule;
+  const paid = (r?.submit_fee_epc ?? 0) > 0;
   return (
     <section id="how" aria-labelledby="how-title" className="min-w-0 scroll-mt-24">
       <h2 id="how-title" className="font-sans font-semibold text-xl md:text-2xl tracking-tight text-[var(--fg-hi)] mb-3">How it works</h2>
@@ -57,10 +58,10 @@ export const HowItWorks: React.FC<{ round: RoundPayload | null }> = ({ round }) 
             <p className="text-[12.5px] text-[var(--dim)]">A vote is an EIP-712 signature, no gas. The balance is checked when you vote and again when voting closes; a wallet that no longer holds the minimum does not count. You cannot vote for your own idea. Every vote and signature is published after the close.</p>
           </Block>
 
-          <Block title="Submit fee and creator fees">
-            <Row k="Submit fee" v={`${r.submit_fee_epc.toLocaleString('en-US')} EPC, burned`} />
+          <Block title={paid ? 'Submit fee and creator fees' : 'Creator fees'}>
+            {paid && <Row k="Submit fee" v={`${r.submit_fee_epc.toLocaleString('en-US')} EPC, burned`} />}
             <Row k="Creator fees" v="50% creator · 50% EPC buyback & burn" />
-            <p className="text-[12.5px] text-[var(--dim)]">The fee is sent straight to the burn address and is not refunded, even if the idea is rejected. Creator fees of the launched token go to a splitter contract with no owner and no withdraw function: it pays the creator&apos;s verified wallet and buys EPC for the burn address. Every distribution is listed with its transaction.</p>
+            <p className="text-[12.5px] text-[var(--dim)]">{paid && 'The fee is sent straight to the burn address and is not refunded, even if the idea is rejected. '}Creator fees of the launched token go to a splitter contract with no owner and no withdraw function: it pays the creator&apos;s verified wallet and buys EPC for the burn address. Every distribution is listed with its transaction.</p>
           </Block>
 
           <Block title="Identity">
@@ -70,7 +71,7 @@ export const HowItWorks: React.FC<{ round: RoundPayload | null }> = ({ round }) 
 
           <Block title="Moderation">
             <ul className="list-disc pl-5 space-y-1 marker:text-[var(--banana)]">
-              {MODERATION_RULES.map((m) => <li key={m}>{m}</li>)}
+              {moderationRules({ paid, manualReview: !round?.dev_open }).map((m) => <li key={m}>{m}</li>)}
             </ul>
           </Block>
         </div>
