@@ -111,9 +111,13 @@ async def submit_idea(db, deps: Deps, *, wallet: str, name: str, ticker: str, lo
     if problems:
         raise ServiceError(422, "invalid_idea", "Some fields need a fix.", {"problems": [p.as_dict() for p in problems]})
 
-    if not (fee_tx or "").startswith("0x") or len(fee_tx) != 66:
-        raise ServiceError(422, "fee_tx_invalid", "The submit fee transaction hash is not valid.")
-    fee_tx = fee_tx.lower()
+    free = settings.GF_SUBMIT_FEE_EPC <= 0   # GF_SUBMIT_FEE_EPC=0: no fee, no transaction to check
+    if free:
+        fee_tx = f"free:{uuid.uuid4().hex}"  # the column is UNIQUE NOT NULL: a placeholder that can never collide
+    else:
+        if not (fee_tx or "").startswith("0x") or len(fee_tx) != 66:
+            raise ServiceError(422, "fee_tx_invalid", "The submit fee transaction hash is not valid.")
+        fee_tx = fee_tx.lower()
 
     round_date = gf_rounds.round_date_at(now, sch)
     await gf_store.ensure_round(db, round_date)
@@ -122,21 +126,24 @@ async def submit_idea(db, deps: Deps, *, wallet: str, name: str, ticker: str, lo
         raise ServiceError(429, "already_submitted_today", "This wallet already submitted an idea today.")
     if await gf_store.count_ideas(db, round_date) >= settings.GF_MAX_IDEAS_PER_DAY:
         raise ServiceError(409, "slots_full", f"All {settings.GF_MAX_IDEAS_PER_DAY} slots for today are taken.")
-    if await gf_store.fee_tx_used(db, fee_tx):
-        raise ServiceError(409, "fee_tx_used", "That fee transaction was already used for another idea.")
+    burned_wei = 0
+    if not free:
+        if await gf_store.fee_tx_used(db, fee_tx):
+            raise ServiceError(409, "fee_tx_used", "That fee transaction was already used for another idea.")
 
-    info = await deps.chain.fee_tx(fee_tx)
-    if info is None:
-        raise ServiceError(503, "chain_unavailable", "Could not read the fee transaction right now. Try again in a minute.")
-    _tx, receipt, block_time = info
-    need = gf_chain.epc_to_wei(settings.GF_SUBMIT_FEE_EPC, settings.GF_EPC_DECIMALS)
-    check = gf_chain.check_fee_receipt(receipt, epc=settings.EPOCH_TOKEN_CA, burn=gf_chain.DEAD_ADDRESS, sender=wallet,
-                                       min_amount_wei=need)
-    if not check.ok:
-        raise ServiceError(422, "fee_tx_rejected", FEE_MESSAGES.get(check.reason, "The fee transaction is not valid."),
-                           {"reason": check.reason})
-    if not gf_chain.fee_tx_fresh(block_time, now):
-        raise ServiceError(422, "fee_tx_rejected", "The fee transaction is too old. Send a new one.", {"reason": "too_old"})
+        info = await deps.chain.fee_tx(fee_tx)
+        if info is None:
+            raise ServiceError(503, "chain_unavailable", "Could not read the fee transaction right now. Try again in a minute.")
+        _tx, receipt, block_time = info
+        need = gf_chain.epc_to_wei(settings.GF_SUBMIT_FEE_EPC, settings.GF_EPC_DECIMALS)
+        check = gf_chain.check_fee_receipt(receipt, epc=settings.EPOCH_TOKEN_CA, burn=gf_chain.DEAD_ADDRESS, sender=wallet,
+                                           min_amount_wei=need)
+        if not check.ok:
+            raise ServiceError(422, "fee_tx_rejected", FEE_MESSAGES.get(check.reason, "The fee transaction is not valid."),
+                               {"reason": check.reason})
+        if not gf_chain.fee_tx_fresh(block_time, now):
+            raise ServiceError(422, "fee_tx_rejected", "The fee transaction is too old. Send a new one.", {"reason": "too_old"})
+        burned_wei = check.amount_wei
 
     embedded = deps.embed([fields["lore"]])
     if inspect.isawaitable(embedded):
@@ -151,6 +158,9 @@ async def submit_idea(db, deps: Deps, *, wallet: str, name: str, ticker: str, lo
         blocklists=deps.blocklists or gf_validation.get_blocklists(), threshold=settings.GF_SIMILARITY_THRESHOLD,
         image_bytes=image, image_moderator=deps.image_moderator, embedder_label=embedder)
 
+    # Development (GF_DEV_OPEN): an idea that passed the automatic checks joins the pool at once, without the manual review
+    status = "approved" if settings.GF_DEV_OPEN and moderation.status == "pending_review" else moderation.status
+
     deps.image_dir.mkdir(parents=True, exist_ok=True)
     path = deps.image_dir / f"{img_info.sha256}.{img_info.ext}"
     if not path.exists():
@@ -159,8 +169,8 @@ async def submit_idea(db, deps: Deps, *, wallet: str, name: str, ticker: str, lo
         "idea_id": new_idea_id(round_date), "round_date": round_date, "x_user_id": creator["x_user_id"], "wallet": wallet,
         "name": fields["name"], "ticker": fields["ticker"], "lore": fields["lore"],
         "image_url": f"{deps.image_base_url.rstrip('/')}/{img_info.sha256}.{img_info.ext}", "image_sha256": img_info.sha256,
-        "fee_tx": fee_tx, "status": moderation.status, "reject_reason": moderation.reason,
-        "auto_flags": {**moderation.flags, "fee_epc_burned": gf_chain.wei_to_epc(check.amount_wei, settings.GF_EPC_DECIMALS)},
+        "fee_tx": fee_tx, "status": status, "reject_reason": moderation.reason,
+        "auto_flags": {**moderation.flags, "fee_epc_burned": gf_chain.wei_to_epc(burned_wei, settings.GF_EPC_DECIMALS)},
         "lore_embedding": embedding, "submitted_at": now,
     }
     # The slot cap and the one-per-wallet rule are re-checked under a lock, so two simultaneous requests cannot both pass

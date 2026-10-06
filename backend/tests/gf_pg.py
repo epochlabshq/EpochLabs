@@ -15,6 +15,11 @@ try:
 except ImportError:  # pragma: no cover
     pgserver = None
 
+# The tests describe the production rules, whatever a developer put in backend/.env (free submits, dev-open rounds)
+from app.core.config import settings as _settings  # noqa: E402
+_settings.GF_SUBMIT_FEE_EPC = 1000.0
+_settings.GF_DEV_OPEN = False
+
 _server = None
 _dir = None
 _ready = False

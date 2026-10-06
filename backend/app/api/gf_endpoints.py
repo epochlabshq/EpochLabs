@@ -340,7 +340,7 @@ async def auth_x_callback(request: Request, code: Optional[str] = None, state: O
 
 @router.post("/ideas")
 async def post_idea(request: Request, name: str = Form(...), ticker: str = Form(...), lore: str = Form(...),
-                    fee_tx: str = Form(...), image: UploadFile = File(...), db: AsyncSession = Depends(get_session_db)):
+                    fee_tx: str = Form(""), image: UploadFile = File(...), db: AsyncSession = Depends(get_session_db)):
     """Submit an idea. Wallet and X account come from the session, never from the form."""
     wallet = require_wallet(request)
     data = await image.read(gf_validation_max() + 1)

@@ -91,7 +91,8 @@ export const SubmitSection: React.FC<Props> = ({ round, busy, actionErrors, conn
   const left = round ? secondsUntil(round.next.at, now) : 0;
   const slotsFull = !!round && round.slots.used >= round.slots.max;
   const canFill = open && !!me?.wallet && !!me.x && !me.is_team && !me.submitted_today && !slotsFull;
-  const feeOk = isTxHash(feeTx);
+  const free = fee <= 0; // GF_SUBMIT_FEE_EPC=0: nothing to burn, nothing to paste
+  const feeOk = free || isTxHash(feeTx);
 
   const onFile = (f: File | null) => {
     setImageError(null);
@@ -132,7 +133,7 @@ export const SubmitSection: React.FC<Props> = ({ round, busy, actionErrors, conn
     form.set('name', name.trim());
     form.set('ticker', ticker);
     form.set('lore', lore.trim());
-    form.set('fee_tx', feeTx.trim());
+    form.set('fee_tx', free ? '' : feeTx.trim());
     form.set('image', file as File);
     const res = await onSubmit(form);
     if (res.idea) {
@@ -239,6 +240,11 @@ export const SubmitSection: React.FC<Props> = ({ round, busy, actionErrors, conn
                 </Field>
               </div>
 
+              {free ? (
+                <p data-testid="fee-free" className="mt-5 rounded-xl border border-[var(--border)] bg-[var(--panel2)] px-4 py-3 text-[13px] text-[var(--dim)]">
+                  Submitting is <span className="text-[var(--fg-hi)]">free</span>. There is no fee to burn.
+                </p>
+              ) : (
               <div className="mt-5 rounded-xl border border-[var(--border)] bg-[var(--panel2)] p-4">
                 <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-[var(--faint)]">Submit fee</div>
                 <p className="mt-1 text-[13px] text-[var(--dim)] leading-relaxed">
@@ -256,6 +262,7 @@ export const SubmitSection: React.FC<Props> = ({ round, busy, actionErrors, conn
                   </div>
                 </div>
               </div>
+              )}
 
               {(actionErrors.pay || actionErrors.submit || formError) && <p role="alert" data-testid="form-error" className="mt-4 text-[13px] text-[var(--stall)]">{formError ?? actionErrors.submit ?? actionErrors.pay}</p>}
               <button type="submit" disabled={!canFill || busy !== null}
