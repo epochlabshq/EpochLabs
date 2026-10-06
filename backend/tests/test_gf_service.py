@@ -204,6 +204,48 @@ class TestSubmit(PgCase):
         self.err(go, 409, "submissions_closed")
         self.err(lambda db: self._at(db, chain, T(21)), 409, "submissions_closed")
 
+    def test_dev_open_flag_accepts_a_submission_at_any_hour(self):
+        chain = FakeChain()
+
+        async def go(db):
+            a = await self.creator(db, 1)
+            return await self.submit(db, chain, a, now=T(21))
+        with mock.patch.object(svc.settings, "GF_DEV_OPEN", True):
+            self.assertIn("idea_id", run(go))
+
+    def test_dev_open_approves_a_clean_idea_without_manual_review(self):
+        chain = FakeChain()
+
+        async def go(db):
+            a = await self.creator(db, 1)
+            return (await self.submit(db, chain, a))["status"]
+        self.assertEqual(run(go), "pending_review")
+        chain = FakeChain()
+        with mock.patch.object(svc.settings, "GF_DEV_OPEN", True):
+            self.assertEqual(run(go), "approved")
+
+    def test_zero_fee_needs_no_transaction(self):
+        chain = FakeChain()
+
+        async def go(db):
+            a = await self.creator(db, 1)
+            out = await self.submit(db, chain, a, tx="", add_fee=False)
+            row = await gf_store.get_idea(db, out["idea_id"])
+            return out, row
+        with mock.patch.object(svc.settings, "GF_SUBMIT_FEE_EPC", 0.0):
+            out, row = run(go)
+        self.assertIn("idea_id", out)
+        self.assertTrue(row["fee_tx"].startswith("free:"))
+        self.assertEqual(row["auto_flags"]["fee_epc_burned"], 0)
+
+    def test_a_paid_round_still_refuses_a_missing_fee_hash(self):
+        chain = FakeChain()
+
+        async def go(db):
+            a = await self.creator(db, 1)
+            await self.submit(db, chain, a, tx="0x12", add_fee=False)
+        self.err(go, 422, "fee_tx_invalid")
+
     async def _at(self, db, chain, now):
         a = await self.creator(db, 1)
         await self.submit(db, chain, a, now=now)

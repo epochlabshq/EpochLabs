@@ -14,7 +14,7 @@ router = APIRouter(prefix="/api")
 
 _cache = None
 _cache_ts = 0.0
-CACHE_TTL_SECONDS = 15.0
+CACHE_TTL_SECONDS = 300.0
 
 _int = lambda v: int(v) if v is not None else None
 _str = lambda v: str(v) if v is not None else None  # wei can exceed JS safe integers

@@ -26,7 +26,10 @@ CYCLE_INTERVAL_SECONDS = 60
 CACHE_REFRESH_INTERVAL_SECONDS = 7200
 
 # Label cycle interval: every 15 minutes (900s)
-LABEL_CYCLE_INTERVAL_SECONDS = 900
+LABEL_CYCLE_INTERVAL_SECONDS = 3600
+
+# A known pending token is re-upserted at most this often (6 hours)
+REPOLL_AFTER_SECONDS = 21600.0
 
 
 async def start_ingest_worker_loop():
@@ -100,12 +103,12 @@ async def start_ingest_worker_loop():
                         # If token already passed ($30K+ peak MC), positive label is permanent. Skip permanently!
                         if status_val == "passed":
                             continue
-                        # If token was polled in the last 15 minutes (900 seconds), skip re-scanning
+                        # If token was polled recently, skip re-scanning (each re-poll is a DB write)
                         if last_polled:
                             if last_polled.tzinfo is None:
                                 last_polled = last_polled.replace(tzinfo=timezone.utc)
                             elapsed = (now_dt - last_polled).total_seconds()
-                            if elapsed < 900.0:
+                            if elapsed < REPOLL_AFTER_SECONDS:
                                 continue
 
                     mints_to_process.append(raw)

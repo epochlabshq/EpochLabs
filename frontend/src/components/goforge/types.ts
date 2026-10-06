@@ -76,6 +76,8 @@ export interface RoundPayload {
   next: { label: NextLabel; at: string };
   slots: { used: number; max: number };
   pool_visible: boolean;
+  /** Development flag on the backend: submissions and votes are open at any hour. */
+  dev_open?: boolean;
   ideas: PublicIdea[];
   n_ideas_approved: number | null;
   n_votes: number | null;

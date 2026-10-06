@@ -27,7 +27,8 @@ const LiveContent: React.FC<{ refreshMe: () => Promise<void> }> = ({ refreshMe }
   const launches = useEmileStore((s) => s.gfLaunches);
   const me = useEmileStore((s) => s.gfMe);
   return (
-    <>
+    // RainbowKit wraps its children, so the page's `space-y` no longer reaches the sections: they carry their own spacing
+    <div className="space-y-10 md:space-y-12">
       {roundError && !round && (
         <div role="status" className="rounded-xl border border-[var(--border)] bg-[var(--panel)] p-6 font-mono text-[13px] text-[var(--dim)]">
           GoForge data unavailable. Nothing is shown unless it can be read from /api/goforge.
@@ -54,7 +55,7 @@ const LiveContent: React.FC<{ refreshMe: () => Promise<void> }> = ({ refreshMe }
       <ScoreboardSection round={round} />
       <ForgedSection data={launches} />
       <HowItWorks round={round} />
-    </>
+    </div>
   );
 };
 

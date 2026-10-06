@@ -397,7 +397,8 @@ class TestXLogin(ApiCase):
     def test_start_needs_a_wallet_session_and_configuration(self):
         self.assertEqual(TestClient(self.app).get("/api/goforge/auth/x").status_code, 401)
         self.login(acct(1))
-        self.assertEqual(self.client.get("/api/goforge/auth/x").status_code, 503)      # not configured
+        with mock.patch.object(settings, "GF_X_CLIENT_ID", ""), mock.patch.object(settings, "GF_X_REDIRECT_URI", ""):
+            self.assertEqual(self.client.get("/api/goforge/auth/x").status_code, 503)  # not configured
 
     def test_start_redirects_to_x_with_pkce(self):
         with self.x_configured():

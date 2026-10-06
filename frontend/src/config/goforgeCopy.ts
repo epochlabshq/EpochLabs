@@ -35,11 +35,14 @@ export const TEAM_RULE = 'The Epoch Labs team and Golem’s own wallets cannot s
 
 export const BLOCKSCOUT_BASE = 'https://robinhoodchain.blockscout.com';
 
-export const MODERATION_RULES = [
-  'Nothing reaches the pool without a person on the team approving it.',
+/** The moderation rules. The fee line only exists when there is a fee, and review is skipped on a dev-open backend. */
+export const moderationRules = (opts: { paid: boolean; manualReview: boolean }) => [
+  opts.manualReview
+    ? 'Nothing reaches the pool without a person on the team approving it.'
+    : 'Ideas that pass the automatic checks join the pool right away.',
   'No brand, company or real person’s name (for example NVIDIA or ELON), in the name or the ticker.',
   'The ticker cannot collide with a token already on Robinhood Chain or a large listed stock.',
   'The image cannot show a well known logo, and must pass the NSFW check.',
   'A near copy of another idea submitted the same day is rejected.',
-  'The submit fee is not refunded, even when an idea is rejected.',
+  ...(opts.paid ? ['The submit fee is not refunded, even when an idea is rejected.'] : []),
 ];

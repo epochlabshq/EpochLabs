@@ -148,13 +148,13 @@ def build_round_payload(*, now: datetime, sch: gf_rounds.Schedule, rnd: dict, ap
     """GET /round. The pool is hidden until submissions close, so nobody can copy an idea they can already see."""
     phase = gf_rounds.phase_at(now, sch)
     label, at = gf_rounds.next_boundary(now, sch)
-    pool_visible = phase != "submit"
+    pool_visible = phase != "submit" or settings.GF_DEV_OPEN
     announced = rnd["status"] in ("announced", "launched")
     return {
         "round_date": rnd["round_date"].isoformat(), "phase": phase, "status": rnd["status"], "now": now.isoformat(),
         "next": {"label": label, "at": at.isoformat()},
         "slots": {"used": n_submitted, "max": settings.GF_MAX_IDEAS_PER_DAY},
-        "pool_visible": pool_visible,
+        "pool_visible": pool_visible, "dev_open": settings.GF_DEV_OPEN,
         "ideas": [svc.public_idea(i, votes.get(i["idea_id"], 0)) for i in approved] if pool_visible else [],
         "n_ideas_approved": len(approved) if pool_visible else None,
         "n_votes": sum(votes.values()) if pool_visible else None,
@@ -340,7 +340,7 @@ async def auth_x_callback(request: Request, code: Optional[str] = None, state: O
 
 @router.post("/ideas")
 async def post_idea(request: Request, name: str = Form(...), ticker: str = Form(...), lore: str = Form(...),
-                    fee_tx: str = Form(...), image: UploadFile = File(...), db: AsyncSession = Depends(get_session_db)):
+                    fee_tx: str = Form(""), image: UploadFile = File(...), db: AsyncSession = Depends(get_session_db)):
     """Submit an idea. Wallet and X account come from the session, never from the form."""
     wallet = require_wallet(request)
     data = await image.read(gf_validation_max() + 1)

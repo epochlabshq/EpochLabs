@@ -21,7 +21,7 @@ const IdeaCard: React.FC<{
   onVote: (id: string) => void; onLogin: () => void;
 }> = ({ idea, round, me, busy, votingFor, isWinner, onVote, onLogin }) => {
   const mine = me?.my_vote?.round_date === round.round_date && me.my_vote.idea_id === idea.idea_id;
-  const open = round.phase === 'vote';
+  const open = round.phase === 'vote' || !!round.dev_open;
   const profile = xProfileUrl(idea.creator_handle);
   return (
     <article
@@ -117,7 +117,7 @@ export const PoolSection: React.FC<Props> = ({ round, me, busy, errors, votingFo
               Could not connect your wallet. The reason is under <a href="#submit" className="underline">Connect your wallet</a> below.
             </p>
           )}
-          {round.phase === 'vote' && (
+          {(round.phase === 'vote' || round.dev_open) && (
             <p className="mb-3 font-mono text-[11.5px] text-[var(--dim)] leading-relaxed">
               Hold at least {round.rules.vote_min_epc.toLocaleString('en-US')} EPC in a wallet older than {round.rules.vote_min_wallet_age_days} days. One vote per wallet, movable until voting closes. A signature, no gas.
             </p>
