@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.db.database import get_db
 from app.db.radar_schema import ensure_radar_schema
+from app.services.radar_status import snapshot
 from app.services.lore_safety import check_profanity, strip_urls, strip_zero_width_and_bidi
 from app.services.radar import (
     CONF_NONE, UNCLUSTERED_ID, RadarParams, confidence_level, narrative_status, wilson_interval,
@@ -212,6 +213,12 @@ async def get_radar(db: AsyncSession = Depends(get_db)):
         print(f"[API ERROR] radar failed: {e}", flush=True)
         raise HTTPException(status_code=503, detail="Radar data unavailable")
     return _store("radar", payload)
+
+
+@router.get("/radar/status")
+async def get_radar_status():
+    """GET /api/radar/status - what the worker is doing and which embedders the server has (no data, no secrets)."""
+    return snapshot()
 
 
 @router.get("/radar/points")
