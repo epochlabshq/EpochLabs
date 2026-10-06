@@ -8,7 +8,8 @@ const nextConfig: NextConfig = {
     resolveAlias: Object.fromEntries(UNUSED_X402.map((name) => [name, './src/lib/emptyModule.ts'])),
   },
   async rewrites() {
-    const backendUrl = process.env.NEXT_PUBLIC_API_BASE_URL || process.env.BACKEND_URL || 'http://127.0.0.1:8000';
+    // A trailing slash in the env var would make the proxied path "//api/...", which the backend answers with 404
+    const backendUrl = (process.env.NEXT_PUBLIC_API_BASE_URL || process.env.BACKEND_URL || 'http://127.0.0.1:8000').replace(/\/+$/, '');
     return [
       {
         source: '/api/:path*',
