@@ -58,12 +58,29 @@ async def _load_tokens(db) -> tuple[pd.DataFrame, int]:
     return df[has_lore].reset_index(drop=True), int((~has_lore).sum())
 
 
-def _embed(lore: list[str]) -> Optional[np.ndarray]:
+FASTEMBED_MODEL = "sentence-transformers/all-MiniLM-L6-v2"  # the same MiniLM the brief names, 384 dimensions
+_fast_model = None
+
+
+def _embed(lore: list[str]) -> Optional[tuple[np.ndarray, str]]:
+    """
+    (embeddings, embedder label), or None when no embedder is installed.
+    sentence-transformers first when present. Production runs without it (PyTorch ran the Railway box out of
+    memory), so the same MiniLM is also read through ONNX with fastembed, which needs no torch. Only the Radar
+    uses this path: the model worker's own features are left exactly as they were.
+    """
+    global _fast_model
     from app.ml.features import get_sentence_model
     model = get_sentence_model()
-    if model is None:
+    if model is not None:
+        return np.asarray(model.encode(lore, batch_size=64, show_progress_bar=False), dtype=float), "all-MiniLM-L6-v2"
+    try:
+        from fastembed import TextEmbedding
+    except ImportError:
         return None
-    return np.asarray(model.encode(lore, batch_size=64, show_progress_bar=False), dtype=float)
+    if _fast_model is None:
+        _fast_model = TextEmbedding(FASTEMBED_MODEL)
+    return np.asarray(list(_fast_model.embed(lore, batch_size=64)), dtype=float), "all-MiniLM-L6-v2 (ONNX)"
 
 
 async def _persist(db, result: RunResult) -> None:
@@ -125,14 +142,16 @@ async def run_radar_cycle(force: bool = False) -> Optional[dict]:
                 "WHERE cluster_id ~ '^c_[0-9]+$'"))).scalar()
             await db.rollback()  # nothing below needs the read transaction while the CPU-heavy part runs
 
-            embeddings = await asyncio.to_thread(_embed, df["lore"].astype(str).tolist())
-            if embeddings is None:
-                print("[RADAR WORKER] sentence-transformers is not installed: run skipped (no fake clusters).")
+            embedded = await asyncio.to_thread(_embed, df["lore"].astype(str).tolist())
+            if embedded is None:
+                print("[RADAR WORKER] No embedder installed (sentence-transformers or fastembed): run skipped, "
+                      "no clusters are made from empty vectors.", flush=True)
                 return None
+            embeddings, embedder = embedded
             df["launched_at"] = pd.to_datetime(df["launched_at"], utc=True)
             result = await asyncio.to_thread(
                 build_run, df, embeddings, prev, int(max_id or 0) + 1, now, RadarParams.from_settings(),
-                n_lore_missing=n_lore_missing)
+                n_lore_missing=n_lore_missing, embedder=embedder)
             await _persist(db, result)
         except Exception:
             await db.rollback()

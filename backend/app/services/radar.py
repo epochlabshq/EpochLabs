@@ -304,7 +304,7 @@ class RunResult:
 
 
 def build_run(df: pd.DataFrame, embeddings: np.ndarray, prev: list[PrevCluster], next_id: int, now: datetime,
-              params: RadarParams, *, n_lore_missing: int = 0) -> RunResult:
+              params: RadarParams, *, n_lore_missing: int = 0, embedder: str = "all-MiniLM-L6-v2") -> RunResult:
     """
     df columns: mint, lore, lore_withheld, launched_at (tz-aware), peak_mc, status ('passed'|'stalled'|'pending').
     embeddings: one row per df row, same order. Returns what the worker persists.
@@ -364,7 +364,7 @@ def build_run(df: pd.DataFrame, embeddings: np.ndarray, prev: list[PrevCluster],
                 "max_noise_fraction": params.max_noise_fraction, "match_max_cosine": params.match_max_cosine,
                 "min_resolved": params.min_resolved, "normal_resolved": params.normal_resolved,
                 "n_lore_missing": n_lore_missing, "n_clusters": len(clusters),
-                "embedder": "all-MiniLM-L6-v2", "umap_seed": UMAP_SEED,
+                "embedder": embedder, "umap_seed": UMAP_SEED,
             },
         },
         clusters=clusters, points=points, unclustered=unclustered,

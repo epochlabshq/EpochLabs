@@ -12,3 +12,5 @@ lightgbm>=4.3.0
 pillow>=10.2.0
 httpx>=0.26.0
 python-dotenv>=1.0.1
+# Radar lore embeddings (MiniLM through ONNX, no torch)
+fastembed>=0.3.0

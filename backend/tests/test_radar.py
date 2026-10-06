@@ -497,6 +497,46 @@ class WorkerScheduleTests(unittest.TestCase):
         self.assertEqual(seconds_until_next(datetime(2026, 10, 7, 23, 15, tzinfo=timezone.utc), 0, 15), 3600)
 
 
+class EmbedderFallbackTests(unittest.TestCase):
+    """Production has no sentence-transformers (it ran the box out of memory): the Radar must still embed."""
+
+    def setUp(self):
+        from app.services import radar_worker
+        self.w = radar_worker
+        self.w._fast_model = None
+
+    def _run(self, st_model, fast_cls):
+        import sys
+        from unittest import mock
+        mods = {"fastembed": mock.Mock(TextEmbedding=fast_cls)} if fast_cls else {"fastembed": None}
+        with mock.patch("app.ml.features.get_sentence_model", return_value=st_model), mock.patch.dict(sys.modules, mods):
+            return self.w._embed(["a lore", "another lore"])
+
+    def test_uses_fastembed_when_sentence_transformers_is_missing(self):
+        class Fake:
+            def __init__(self, name):
+                self.name = name
+
+            def embed(self, texts, batch_size=64):
+                return (np.ones(384) * (i + 1) for i, _ in enumerate(texts))
+
+        emb, label = self._run(None, Fake)
+        self.assertEqual(emb.shape, (2, 384))
+        self.assertIn("ONNX", label)
+
+    def test_prefers_sentence_transformers_when_installed(self):
+        class ST:
+            def encode(self, texts, batch_size=64, show_progress_bar=False):
+                return np.zeros((len(texts), 384))
+
+        emb, label = self._run(ST(), None)
+        self.assertEqual(emb.shape, (2, 384))
+        self.assertEqual(label, "all-MiniLM-L6-v2")
+
+    def test_no_embedder_means_no_run(self):
+        self.assertIsNone(self._run(None, None))
+
+
 class CopyRulesTests(unittest.TestCase):
     def test_forbidden_words_are_absent_from_the_page_copy(self):
         root = Path(__file__).resolve().parents[2] / "frontend" / "src"
