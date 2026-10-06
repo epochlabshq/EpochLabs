@@ -83,7 +83,7 @@ class Settings(BaseSettings):
     JAR_GATE_CAP: float = 0.95
 
     # Model worker: retrain when the labeled set changes, checked every N seconds
-    MODEL_WORKER_INTERVAL_SECONDS: int = int(os.getenv("MODEL_WORKER_INTERVAL_SECONDS", "3600"))
+    MODEL_WORKER_INTERVAL_SECONDS: int = int(os.getenv("MODEL_WORKER_INTERVAL_SECONDS", "21600"))
     # Only one deployment should run the writers below against a database. A local backend that shares the
     # production database should turn off what production already runs (see backend/.env.example).
     INGEST_WORKER_ENABLED: bool = os.getenv("INGEST_WORKER_ENABLED", "true").lower() in ("true", "1", "yes")
@@ -123,7 +123,7 @@ class Settings(BaseSettings):
     # Node limit for eth_getLogs without an address filter is 30,000 blocks
     EPOCH_LOG_CHUNK_BLOCKS: int = int(os.getenv("EPOCH_LOG_CHUNK_BLOCKS", "30000"))
     EPOCH_MAX_CHUNKS_PER_TICK: int = int(os.getenv("EPOCH_MAX_CHUNKS_PER_TICK", "40"))
-    EPOCH_WATCHER_INTERVAL_SECONDS: int = int(os.getenv("EPOCH_WATCHER_INTERVAL_SECONDS", "900"))
+    EPOCH_WATCHER_INTERVAL_SECONDS: int = int(os.getenv("EPOCH_WATCHER_INTERVAL_SECONDS", "3600"))
     EPOCH_WATCHER_ENABLED: bool = os.getenv("EPOCH_WATCHER_ENABLED", "true").lower() in ("true", "1", "yes")
 
     UNISWAP_V2_FACTORY: str = os.getenv("UNISWAP_V2_FACTORY", "0x8bceaa40b9acdfaedf85adf4ff01f5ad6517937f")
@@ -137,7 +137,7 @@ class Settings(BaseSettings):
     DESK_MAX_HOLD_H: int = int(os.getenv("DESK_MAX_HOLD_H", "48"))
     DESK_MIN_LIQ_USD: float = float(os.getenv("DESK_MIN_LIQ_USD", "5000"))
     DESK_START_ETH: float = float(os.getenv("DESK_START_ETH", "1.0"))
-    DESK_HEARTBEAT_WARN_SECONDS: int = int(os.getenv("DESK_HEARTBEAT_WARN_SECONDS", "900"))
+    DESK_HEARTBEAT_WARN_SECONDS: int = int(os.getenv("DESK_HEARTBEAT_WARN_SECONDS", "5400"))
     DESK_DROPPED_VISIBLE_H: int = int(os.getenv("DESK_DROPPED_VISIBLE_H", "6"))
     DESK_DROPPED_REVEAL_H: int = int(os.getenv("DESK_DROPPED_REVEAL_H", "48"))
     DESK_WATCHING_LIMIT: int = int(os.getenv("DESK_WATCHING_LIMIT", "10"))
@@ -164,7 +164,7 @@ class Settings(BaseSettings):
     # Watching shows a token while its live market cap is at or above this (the feed's $10K entry bar)
     DESK_WATCH_MIN_MC_USD: float = float(os.getenv("DESK_WATCH_MIN_MC_USD", "10000"))
     DESK_HOLDERS_BATCH: int = int(os.getenv("DESK_HOLDERS_BATCH", "20"))
-    DESK_WORKER_INTERVAL_SECONDS: int = int(os.getenv("DESK_WORKER_INTERVAL_SECONDS", "300"))
+    DESK_WORKER_INTERVAL_SECONDS: int = int(os.getenv("DESK_WORKER_INTERVAL_SECONDS", "1800"))
     DESK_WORKER_ENABLED: bool = os.getenv("DESK_WORKER_ENABLED", "true").lower() in ("true", "1", "yes")
 
     @property
@@ -174,24 +174,74 @@ class Settings(BaseSettings):
         from app.core.goforge_config import goforge_cas
         return frozenset(a.lower() for a in [self.EPOCH_TOKEN_CA, self.EMILE_BANANA_TOKEN_CA, *extra]) | goforge_cas()
 
-    # GoForge (launch page). The gate numbers are defaults until the owner confirms them.
+    # GoForge: live tracking of every launched token (Blockscout + DexScreener) and the 48h verdict
     GOFORGE_WORKER_ENABLED: bool = os.getenv("GOFORGE_WORKER_ENABLED", "true").lower() in ("true", "1", "yes")
-    GOFORGE_WORKER_INTERVAL_SECONDS: int = int(os.getenv("GOFORGE_WORKER_INTERVAL_SECONDS", "60"))
+    GOFORGE_WORKER_INTERVAL_SECONDS: int = int(os.getenv("GOFORGE_WORKER_INTERVAL_SECONDS", "900"))
     # A launch with a locked verdict is refreshed this rarely (keeps the database operation budget small)
-    GOFORGE_SETTLED_INTERVAL_SECONDS: int = int(os.getenv("GOFORGE_SETTLED_INTERVAL_SECONDS", "600"))
-    GOFORGE_HOLDERS_LIST_INTERVAL_SECONDS: int = int(os.getenv("GOFORGE_HOLDERS_LIST_INTERVAL_SECONDS", "300"))
-    GOFORGE_STALE_AFTER_SECONDS: int = int(os.getenv("GOFORGE_STALE_AFTER_SECONDS", "180"))
+    GOFORGE_SETTLED_INTERVAL_SECONDS: int = int(os.getenv("GOFORGE_SETTLED_INTERVAL_SECONDS", "3600"))
+    GOFORGE_HOLDERS_LIST_INTERVAL_SECONDS: int = int(os.getenv("GOFORGE_HOLDERS_LIST_INTERVAL_SECONDS", "900"))
+    GOFORGE_STALE_AFTER_SECONDS: int = int(os.getenv("GOFORGE_STALE_AFTER_SECONDS", "2700"))
     GOFORGE_PUBLIC_URL: str = os.getenv("GOFORGE_PUBLIC_URL", "https://epochlabs.run/goforge")
     GOFORGE_DEX_CHAIN: str = os.getenv("GOFORGE_DEX_CHAIN", "robinhood")
     GOFORGE_VERDICT_HOURS: int = int(os.getenv("GOFORGE_VERDICT_HOURS", "48"))
     GOFORGE_TARGET_MC_USD: float = float(os.getenv("GOFORGE_TARGET_MC_USD", "30000"))
-    GOFORGE_GATE_MIN_TRADES: int = int(os.getenv("GOFORGE_GATE_MIN_TRADES", "30"))
-    GOFORGE_COOLDOWN_DAYS: int = int(os.getenv("GOFORGE_COOLDOWN_DAYS", "7"))
-    # No machine-readable source for "model retrained on entry-time signals" yet: the owner flips this
-    GOFORGE_MODEL_FIX_DONE: bool = os.getenv("GOFORGE_MODEL_FIX_DONE", "false").lower() in ("true", "1", "yes")
-    GOFORGE_LAUNCH_RESERVE_ETH: float = float(os.getenv("GOFORGE_LAUNCH_RESERVE_ETH", "0.5"))
-    # golem_swaps has no gas column: gas is estimated as 2 txs per closed trade at this price (0 = ignore gas)
-    GOFORGE_GAS_ETH_PER_TX: float = float(os.getenv("GOFORGE_GAS_ETH_PER_TX", "0"))
+
+    # GoForge Registry (community launch): one round per UTC day. Every number below is a default until the owner
+    # confirms it (brief section 13); none of it is hardcoded in the logic.
+    GF_ENABLED: bool = os.getenv("GF_ENABLED", "true").lower() in ("true", "1", "yes")
+    GF_WORKER_INTERVAL_SECONDS: int = int(os.getenv("GF_WORKER_INTERVAL_SECONDS", "60"))
+    GF_SUBMIT_OPEN_HOUR_UTC: int = int(os.getenv("GF_SUBMIT_OPEN_HOUR_UTC", "0"))
+    GF_SUBMIT_CLOSE_HOUR_UTC: int = int(os.getenv("GF_SUBMIT_CLOSE_HOUR_UTC", "12"))
+    GF_VOTE_CLOSE_HOUR_UTC: int = int(os.getenv("GF_VOTE_CLOSE_HOUR_UTC", "20"))
+    GF_ANNOUNCE_MINUTE_UTC: int = int(os.getenv("GF_ANNOUNCE_MINUTE_UTC", "5"))
+    GF_LAUNCH_WINDOW_HOURS: int = int(os.getenv("GF_LAUNCH_WINDOW_HOURS", "24"))
+    GF_MAX_IDEAS_PER_DAY: int = int(os.getenv("GF_MAX_IDEAS_PER_DAY", "100"))
+    GF_SUBMIT_FEE_EPC: float = float(os.getenv("GF_SUBMIT_FEE_EPC", "1000"))
+    GF_VOTE_MIN_EPC: float = float(os.getenv("GF_VOTE_MIN_EPC", "1000"))
+    GF_VOTE_MIN_WALLET_AGE_DAYS: int = int(os.getenv("GF_VOTE_MIN_WALLET_AGE_DAYS", "7"))
+    GF_VOTE_CHANGES_PER_HOUR: int = int(os.getenv("GF_VOTE_CHANGES_PER_HOUR", "30"))
+    GF_WIN_COOLDOWN_DAYS: int = int(os.getenv("GF_WIN_COOLDOWN_DAYS", "7"))
+    GF_EPC_DECIMALS: int = int(os.getenv("GF_EPC_DECIMALS", "18"))
+    GF_SIMILARITY_THRESHOLD: float = float(os.getenv("GF_SIMILARITY_THRESHOLD", "0.95"))
+    @property
+    def gf_team_wallets(self) -> frozenset[str]:
+        extra = [a.strip().lower() for a in self.GF_TEAM_WALLETS.split(",") if a.strip()]
+        return frozenset([self.GOLEM_WALLET.lower(), self.GOLEM_AGENT.lower(), self.EPOCH_LAUNCHER_OWNER.lower(), *extra])
+
+    @property
+    def gf_team_x_user_ids(self) -> frozenset[str]:
+        return frozenset(a.strip() for a in self.GF_TEAM_X_USER_IDS.split(",") if a.strip())
+
+    # Sessions, SIWE and X OAuth 2.0 (PKCE). Without GF_SESSION_SECRET login is refused, never "open".
+    GF_SESSION_SECRET: str = os.getenv("GF_SESSION_SECRET", "")
+    GF_SESSION_TTL_HOURS: int = int(os.getenv("GF_SESSION_TTL_HOURS", "168"))
+    GF_SIWE_DOMAIN: str = os.getenv("GF_SIWE_DOMAIN", "epochlabs.run")
+    GF_SIWE_URI: str = os.getenv("GF_SIWE_URI", "https://epochlabs.run/goforge")
+    GF_FRONTEND_URL: str = os.getenv("GF_FRONTEND_URL", "https://epochlabs.run/goforge")
+    GF_X_CLIENT_ID: str = os.getenv("GF_X_CLIENT_ID", "")
+    GF_X_CLIENT_SECRET: str = os.getenv("GF_X_CLIENT_SECRET", "")
+    GF_X_REDIRECT_URI: str = os.getenv("GF_X_REDIRECT_URI", "")
+    # The team may not submit or vote: wallets and X user ids, comma separated (Golem's own wallets are always included)
+    GF_TEAM_WALLETS: str = os.getenv("GF_TEAM_WALLETS", "")
+    GF_TEAM_X_USER_IDS: str = os.getenv("GF_TEAM_X_USER_IDS", "")
+    # Manual review and launch registration (admin API). Empty = the admin endpoints answer 403.
+    GF_ADMIN_TOKEN: str = os.getenv("GF_ADMIN_TOKEN", "")
+    # "manual": Golem schedules the launch, the team launches on Pons and registers the CA. "pons" is a stub.
+    GF_LAUNCH_MODE: str = os.getenv("GF_LAUNCH_MODE", "manual").lower()
+    GF_IMAGE_DIR: str = os.getenv("GF_IMAGE_DIR", "")
+    GF_IMAGE_BASE_URL: str = os.getenv("GF_IMAGE_BASE_URL", "/api/goforge/images")
+    # FeeSplitter factory and the keeper key that calls distribute() every GF_DISTRIBUTE_INTERVAL_HOURS (off when empty)
+    GF_SPLITTER_FACTORY: str = os.getenv("GF_SPLITTER_FACTORY", "")
+    GF_KEEPER_PRIVATE_KEY: str = os.getenv("GF_KEEPER_PRIVATE_KEY", "")
+    GF_DISTRIBUTE_INTERVAL_HOURS: int = int(os.getenv("GF_DISTRIBUTE_INTERVAL_HOURS", "24"))
+    # Link template for the live post, e.g. "https://pons.example/token/{ca}". Empty = the live post carries no Pons line.
+    GF_PONS_URL_TEMPLATE: str = os.getenv("GF_PONS_URL_TEMPLATE", "")
+    GF_EXTRA_STOCK_TICKERS: str = os.getenv("GF_EXTRA_STOCK_TICKERS", "")
+    GF_EXTRA_BLOCKED_NAMES: str = os.getenv("GF_EXTRA_BLOCKED_NAMES", "")
+    # Announcements on X: live only with TWITTER_AUTO_POST_ENABLED as well, otherwise dry runs
+    # Longest post the X account can send (weighted). 280 for a standard account; X Premium allows far more.
+    GF_X_MAX_CHARS: int = int(os.getenv("GF_X_MAX_CHARS", "280"))
+    GF_X_POST_ENABLED: bool = os.getenv("GF_X_POST_ENABLED", "false").lower() in ("true", "1", "yes")
 
     # Meta Radar (narrative map). One clustering run per day at RADAR_RUN_HOUR_UTC:RADAR_RUN_MINUTE_UTC.
     RADAR_WORKER_ENABLED: bool = os.getenv("RADAR_WORKER_ENABLED", "true").lower() in ("true", "1", "yes")

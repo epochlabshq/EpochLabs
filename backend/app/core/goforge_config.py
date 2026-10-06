@@ -103,14 +103,35 @@ def load_launches(path: Optional[Path] = None) -> list[LaunchEntry]:
     return entries
 
 
+# Community launches (GoForge Registry) registered at runtime, on top of the config file. Held in memory; the registry
+# reloads them from the database at startup, so the trading exclude list is complete again after a restart.
+_runtime: dict[str, LaunchEntry] = {}
+
+
+def register_runtime_entry(entry: LaunchEntry) -> None:
+    _runtime[entry.id] = entry
+
+
+def clear_runtime_entries() -> None:
+    _runtime.clear()
+
+
+def all_entries() -> list[LaunchEntry]:
+    """Config entries first, then the community launches registered at runtime (an id already in the config wins)."""
+    entries = list(load_launches())
+    seen = {e.id for e in entries}
+    return entries + [e for e in _runtime.values() if e.id not in seen]
+
+
 def goforge_cas() -> frozenset[str]:
     """Every GoForge CA, lower-cased. Golem must never buy or sell any of them.
 
     Never raises: a broken config file must not take trading down, but it must not silently shrink the exclude
     list either, so the last good copy is kept and the error is logged.
     """
+    runtime = frozenset(e.ca for e in _runtime.values())
     try:
-        return frozenset(e.ca for e in load_launches())
+        return frozenset(e.ca for e in load_launches()) | runtime
     except (GoForgeConfigError, ValueError, OSError) as e:
         print(f"[GOFORGE] Config unreadable, using last good copy: {e}", flush=True)
-        return frozenset(e.ca for e in _cache["entries"])
+        return frozenset(e.ca for e in _cache["entries"]) | runtime

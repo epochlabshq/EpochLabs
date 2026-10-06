@@ -2,12 +2,13 @@
 
 import React from 'react';
 import { VERDICT_LABEL } from '@/config/goforgeCopy';
+import { xProfileUrl } from '@/lib/gf';
 import { LiveNumber, useNow } from '@/components/desk/DeskUi';
+import { useEmileStore } from '@/store/useEmileStore';
 import { CopyButton } from './CopyButton';
-import { HookRulesBlock } from './HookRules';
 import { MiniChart } from './MiniChart';
 import {
-  fmtAgo, fmtCountdown, fmtDateTime, fmtInt, fmtPriceUsd, fmtTokens, fmtUsd, secondsToVerdict, shortAddr,
+  fmtAgo, fmtCountdown, fmtDateTime, fmtEth, fmtInt, fmtPriceUsd, fmtTokens, fmtUsd, secondsToVerdict, shortAddr,
   VERDICT_WINDOW_H, type Launch, type Verdict,
 } from './types';
 
@@ -37,50 +38,40 @@ const Stat: React.FC<{ label: string; children: React.ReactNode }> = ({ label, c
 );
 
 const ExtLink: React.FC<{ href: string; children: React.ReactNode }> = ({ href, children }) => (
-  <a
-    href={href}
-    target="_blank"
-    rel="noopener noreferrer"
-    onClick={(e) => e.stopPropagation()}
-    className="text-[var(--banana)] hover:underline"
-  >
-    {children}
-  </a>
+  <a href={href} target="_blank" rel="noopener noreferrer" className="text-[var(--banana)] hover:underline">{children}</a>
 );
 
 // X turns $TICKER into a stock card: share text never carries a "$" before a word
-const xShareUrl = (text: string) =>
-  `https://x.com/intent/post?text=${encodeURIComponent(text.replace(/\$(?=\w)/g, ''))}`;
+const xShareUrl = (text: string) => `https://x.com/intent/post?text=${encodeURIComponent(text.replace(/\$(?=\w)/g, ''))}`;
 
-export const LaunchCard: React.FC<{ launch: Launch; flash: boolean; onWhy: (l: Launch) => void }> = ({ launch: l, flash, onWhy }) => {
-  const now = useNow(1000);
+export const LaunchCard: React.FC<{ launch: Launch }> = ({ launch: l }) => {
+  const now = useNow(1000) + useEmileStore((s) => s.gfClockOffsetMs); // the server's clock, not a wrong local one
   const left = l.verdict === 'pending' ? secondsToVerdict(l.launched_at, VERDICT_WINDOW_H, now) : null;
   const title = l.name ?? l.symbol ?? 'Unnamed token';
   const staleAge = l.market_updated_at ? (now - new Date(l.market_updated_at).getTime()) / 1000 : null;
-  const open = () => onWhy(l);
+  const profile = xProfileUrl(l.creator_handle);
 
   return (
-    <article
-      data-testid="launch-card"
-      data-launch-id={l.id}
-      aria-label={`${title} launch`}
-      onClick={open}
-      className={`rounded-2xl border bg-[var(--panel)] p-4 md:p-5 cursor-pointer transition-colors hover:border-[var(--border-strong)] min-w-0 ${
-        flash ? 'desk-row-new border-[var(--banana)]' : 'border-[var(--border)]'
-      }`}
-    >
+    <article data-testid="launch-card" data-launch-id={l.id} aria-label={`${title} launch`} className="rounded-2xl border border-[var(--border)] bg-[var(--panel)] p-4 md:p-5 min-w-0">
       <header className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h3 className="font-sans font-semibold text-xl md:text-2xl tracking-tight text-[var(--fg-hi)] break-words">
-            {title}
-            {l.symbol && l.name && <span className="ml-2 font-mono text-[14px] font-normal text-[var(--dim)]">{l.symbol}</span>}
-          </h3>
-          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[11.5px] text-[var(--dim)]">
-            <span className="inline-flex items-center gap-2 min-w-0">
-              <span className="break-all" title={l.ca}>{shortAddr(l.ca)}</span>
-              <CopyButton value={l.ca} label="contract address" />
-            </span>
-            <span>launched {fmtDateTime(l.launched_at)}</span>
+        <div className="flex gap-3 min-w-0">
+          {l.image_url && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={l.image_url} alt={`${title} artwork`} width={64} height={64} loading="lazy" className="w-16 h-16 rounded-xl object-cover border border-[var(--border-strong)] bg-[var(--panel2)] shrink-0" />
+          )}
+          <div className="min-w-0">
+            <h3 className="font-sans font-semibold text-xl md:text-2xl tracking-tight text-[var(--fg-hi)] break-words">
+              {title}
+              {l.symbol && l.name && <span className="ml-2 font-mono text-[14px] font-normal text-[var(--dim)]">{l.symbol}</span>}
+            </h3>
+            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[11.5px] text-[var(--dim)]">
+              {profile && <a href={profile} target="_blank" rel="noopener noreferrer" className="hover:text-[var(--banana)] hover:underline">by @{l.creator_handle}</a>}
+              <span className="inline-flex items-center gap-2 min-w-0">
+                <span title={l.ca}>{shortAddr(l.ca)}</span>
+                <CopyButton value={l.ca} label="contract address" />
+              </span>
+              <span>launched {fmtDateTime(l.launched_at)}</span>
+            </div>
           </div>
         </div>
         <VerdictBadge verdict={l.verdict} />
@@ -89,12 +80,8 @@ export const LaunchCard: React.FC<{ launch: Launch; flash: boolean; onWhy: (l: L
       {l.verdict === 'pending' ? (
         <div className="mt-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
           <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-[var(--faint)]">Verdict in</span>
-          <span data-testid="countdown" className="font-mono tabular-nums text-[22px] text-[var(--banana)]">
-            {left === null ? '—' : fmtCountdown(left)}
-          </span>
-          <span className="font-mono text-[11.5px] text-[var(--dim)]">
-            reaches $30K within {VERDICT_WINDOW_H}h or it is marked stalled
-          </span>
+          <span data-testid="countdown" className="font-mono tabular-nums text-[22px] text-[var(--banana)]">{left === null ? '—' : fmtCountdown(left)}</span>
+          <span className="font-mono text-[11.5px] text-[var(--dim)]">reaches $30K within {VERDICT_WINDOW_H}h or it is marked stalled</span>
         </div>
       ) : (
         <p className="mt-3 font-mono text-[11.5px] text-[var(--dim)]">
@@ -119,29 +106,38 @@ export const LaunchCard: React.FC<{ launch: Launch; flash: boolean; onWhy: (l: L
 
       <div className="mt-4 grid grid-cols-1 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] gap-4 items-start">
         <MiniChart id={l.id} launchedAt={l.launched_at} live={l.verdict === 'pending'} />
-        <div className="space-y-4 min-w-0">
+        <div className="space-y-3 min-w-0">
           <dl className="grid grid-cols-2 gap-x-4">
-            <Stat label="Fees routed">{l.fee_router_address ? fmtUsd(l.fees_usd) : 'pending'}</Stat>
-            <Stat label="EPC burned">{l.fee_router_address ? fmtTokens(l.epc_burned) : 'pending'}</Stat>
+            <Stat label="Paid to creator">{l.community ? fmtEth(l.fees_to_creator_eth ?? 0) : '—'}</Stat>
+            <Stat label="EPC burned">{l.community ? fmtTokens(l.epc_burned_from_fees ?? 0) : '—'}</Stat>
           </dl>
-          <HookRulesBlock rules={l.rules} pending={l.rules_pending} />
+          {l.community && (
+            <div>
+              <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-[var(--faint)] mb-1">Fee distributions</div>
+              {l.distributions && l.distributions.length > 0 ? (
+                <ul className="space-y-1 font-mono text-[11.5px]" data-testid="distributions">
+                  {l.distributions.slice(-3).reverse().map((d) => (
+                    <li key={d.tx_hash} className="flex flex-wrap gap-x-3 text-[var(--dim)]">
+                      <span>{fmtEth(d.creator_eth)} to creator</span>
+                      <span>{fmtTokens(d.epc_burned)} EPC burned</span>
+                      <ExtLink href={d.tx_url}>tx</ExtLink>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="font-mono text-[11.5px] text-[var(--dim)]">No distribution yet. Creator fees are split 50/50 on the first one.</p>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
-      <footer className="mt-4 pt-3 border-t border-[var(--rule)] flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-[12px]">
-          <ExtLink href={l.links.blockscout_token}>Blockscout</ExtLink>
-          <ExtLink href={l.links.launch_tx}>Launch tx</ExtLink>
-          <ExtLink href={l.links.dexscreener}>DexScreener</ExtLink>
-          <ExtLink href={xShareUrl(l.share_text)}>Share on X</ExtLink>
-        </div>
-        <button
-          type="button"
-          onClick={(e) => { e.stopPropagation(); open(); }}
-          className="font-mono text-[12px] text-[var(--banana)] hover:underline"
-        >
-          Why Golem launched it →
-        </button>
+      <footer className="mt-4 pt-3 border-t border-[var(--rule)] flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-[12px]">
+        <ExtLink href={l.links.blockscout_token}>Blockscout</ExtLink>
+        <ExtLink href={l.links.launch_tx}>Launch tx</ExtLink>
+        <ExtLink href={l.links.dexscreener}>DexScreener</ExtLink>
+        {l.splitter_address && <ExtLink href={`${l.links.blockscout_token.split('/token/')[0]}/address/${l.splitter_address}`}>Fee splitter</ExtLink>}
+        <ExtLink href={xShareUrl(l.share_text)}>Share on X</ExtLink>
       </footer>
     </article>
   );

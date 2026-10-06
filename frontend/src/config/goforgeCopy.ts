@@ -1,27 +1,26 @@
-// Copy for /goforge, verbatim from the Developer Brief. Text only: statuses and numbers come from /api/goforge.
+// Copy for /goforge. Text only: every number (fees, thresholds, slots) comes from /api/goforge/round.
+
+// GoForge ships dark: the page shows "Coming soon" until NEXT_PUBLIC_GOFORGE_LIVE=true (set it once the backend has its
+// login, X app and admin keys, see backend/.env.example).
+export const GOFORGE_LIVE = process.env.NEXT_PUBLIC_GOFORGE_LIVE === 'true';
 
 export const GOFORGE_HERO = {
   title: 'GoForge.',
-  subtitle: 'What Golem builds from what it learned.',
+  subtitle: 'You submit. The community votes. Golem forges one a day.',
   intro:
-    'Every token Golem launches on its own, explained win or lose. The record is built from the chain, Blockscout and DexScreener, and the 48 hour verdict cannot be edited after the fact.',
+    'Anyone can submit a token idea. EPC holders vote for their favourite. Every day Golem scores the pool, picks one winner and launches it on Pons. Half of the creator fees goes to the creator, half buys back and burns EPC.',
 };
 
-export const GATE_LABEL: Record<string, string> = {
-  locked: 'Locked',
-  ready: 'Ready',
-  forging: 'Forging',
-  cooldown: 'Cooldown',
+export const GOFORGE_SOON = {
+  badge: 'Coming soon',
+  title: 'GoForge opens soon.',
+  body: 'A new token idea is forged every day. Submit yours, let EPC holders vote, and Golem launches the winner. The creator earns half of the fees, the other half buys back and burns EPC.',
+  items: [
+    { title: 'Submit', text: 'Name, ticker, lore and a square image, signed with your wallet and your X account.' },
+    { title: 'Vote', text: 'EPC holders vote with a signature, no gas. One wallet, one vote a day.' },
+    { title: 'Golem forges one', text: 'Scored on creator credibility, Golem’s own model and the vote. Every score is published.' },
+  ],
 };
-
-export const GATE_COPY: Record<string, string> = {
-  locked: 'Golem does not launch until every gate below holds.',
-  ready: 'Every gate holds. Golem can launch.',
-  forging: 'A launch is inside its 48 hour window.',
-  cooldown: 'Every other gate holds. Golem waits out the cooldown.',
-};
-
-export const GOFORGE_EMPTY = 'No launches yet. GoForge opens when every gate holds.';
 
 export const VERDICT_LABEL: Record<string, string> = {
   pending: 'Pending',
@@ -29,29 +28,18 @@ export const VERDICT_LABEL: Record<string, string> = {
   stalled: 'Stalled',
 };
 
-export const RULES_PENDING = 'Rules: pending deployment.';
-
 export const GOFORGE_DISCLAIMER =
-  'Golem launches tokens as a research experiment. Not financial advice. Golem never buys or sells its own launches.';
+  'GoForge launches community ideas as a research experiment. Epoch Labs and Golem hold no supply and never trade GoForge tokens. Not financial advice.';
 
-export const GOFORGE_ADDRESSES = {
-  launcher: '0x75fd64Cc8D57c529f34089Ac9083E704c23F0D8B',
-  agent: '0x560Eb3767434006b3278810f906d7677C38914aD',
-  wallet: '0x49EdF5f24216e02EEb6a947cC3dF0CDB6B84582C',
-};
+export const TEAM_RULE = 'The Epoch Labs team and Golem’s own wallets cannot submit or vote.';
 
 export const BLOCKSCOUT_BASE = 'https://robinhoodchain.blockscout.com';
 
-// GoForge ships dark: the page shows "Coming soon" until NEXT_PUBLIC_GOFORGE_LIVE=true (set it when the first launch is near).
-export const GOFORGE_LIVE = process.env.NEXT_PUBLIC_GOFORGE_LIVE === 'true';
-
-export const GOFORGE_SOON = {
-  badge: 'Coming soon',
-  title: 'GoForge opens when every gate holds.',
-  body: 'Golem has not launched a token of its own yet. When it does, every launch will appear here with live numbers, a locked 48 hour verdict and the reason it was launched, win or lose.',
-  items: [
-    { title: 'Launch Gate', text: 'Five conditions Golem must meet before it launches, shown live.' },
-    { title: '48 hour verdict', text: 'Reached $30K or stalled. Locked at hour 48 and never edited.' },
-    { title: 'Why Golem launched it', text: 'The logged reason and its hash, so it cannot be rewritten after the result.' },
-  ],
-};
+export const MODERATION_RULES = [
+  'Nothing reaches the pool without a person on the team approving it.',
+  'No brand, company or real person’s name (for example NVIDIA or ELON), in the name or the ticker.',
+  'The ticker cannot collide with a token already on Robinhood Chain or a large listed stock.',
+  'The image cannot show a well known logo, and must pass the NSFW check.',
+  'A near copy of another idea submitted the same day is rejected.',
+  'The submit fee is not refunded, even when an idea is rejected.',
+];

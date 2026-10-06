@@ -11,7 +11,7 @@ export function useEmileDatabase() {
   const onEpochEvent = useEmileStore((state) => state.onEpochEvent);
   const requestEpochsRefresh = useEmileStore((state) => state.requestEpochsRefresh);
   const onDeskEvent = useEmileStore((state) => state.onDeskEvent);
-  const onGoForgeEvent = useEmileStore((state) => state.onGoForgeEvent);
+  const onGfEvent = useEmileStore((state) => state.onGfEvent);
 
   useEffect(() => {
     const apiBase = getApiBaseUrl();
@@ -145,8 +145,10 @@ export function useEmileDatabase() {
           if (payload.desk_state || payload.desk_waiting || payload.desk_open || payload.desk_close) {
             onDeskEvent(payload);
           }
-          if (payload.goforge_update || payload.goforge_verdict || payload.goforge_burn) {
-            onGoForgeEvent(payload);
+          // gf_*: the registry (votes, phases, winner, launch, verdict). goforge_*: the live-data watcher of a launched token.
+          if (payload.gf_vote || payload.gf_phase || payload.gf_winner || payload.gf_launch || payload.gf_verdict
+              || payload.goforge_update || payload.goforge_verdict || payload.goforge_burn) {
+            onGfEvent(payload);
           }
           if (payload.model) {
             updateModel(payload.model);
@@ -169,5 +171,5 @@ export function useEmileDatabase() {
     return () => {
       if (socket) socket.close();
     };
-  }, [addToken, updateModel, setSimParams, setConnected, setThresholds, onEpochEvent, requestEpochsRefresh, onDeskEvent, onGoForgeEvent]);
+  }, [addToken, updateModel, setSimParams, setConnected, setThresholds, onEpochEvent, requestEpochsRefresh, onDeskEvent, onGfEvent]);
 }

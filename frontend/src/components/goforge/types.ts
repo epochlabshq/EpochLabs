@@ -1,49 +1,150 @@
-// GET /api/goforge and /api/goforge/{id}/history. Mirrors backend/app/api/goforge_endpoints.py.
+// GoForge Registry API. Mirrors backend/app/api/gf_endpoints.py and goforge_endpoints.py.
 // A number the backend could not read is null, never 0: the UI shows a dash or "pending".
 
-export type GateStatus = 'locked' | 'ready' | 'forging' | 'cooldown';
+export type Phase = 'submit' | 'vote' | 'scoring' | 'announced';
 export type Verdict = 'pending' | 'reached_30k' | 'stalled';
+export type IdeaStatus = 'pending_review' | 'approved' | 'rejected';
+export type NextLabel = 'submit_closes' | 'vote_closes' | 'announcement' | 'submit_opens';
 
-export interface GateCondition {
-  key: 'trading_proof' | 'track_record' | 'model_fix' | 'cooldown' | 'capital' | string;
-  label: string;
-  passed: boolean;
-  current?: number | null;
-  target?: number;
+export interface PublicIdea {
+  idea_id: string;
+  name: string;
+  ticker: string;
+  lore: string;
+  image_url: string;
+  creator_handle: string | null;
+  votes: number | null;
+  submitted_at: string | null;
 }
 
-export interface Gate {
-  status: GateStatus;
-  blocked_by: string[];
-  conditions: GateCondition[];
-  next_launch_possible_at: string | null;
+export interface OwnIdea extends Omit<PublicIdea, 'votes'> {
+  round_date: string;
+  status: IdeaStatus;
+  reject_reason: string | null;
 }
 
-export interface GoForgeTotals {
+export interface Winner extends PublicIdea {
+  scores: { credibility: number; golem: number; vote: number; final: number };
+}
+
+export interface RoundTotals {
   launches: number;
-  reached_30k: number;
-  stalled: number;
-  pending: number;
-  fees_usd: number | null;
-  epc_burned: number | null;
+  epc_burned_from_fees: number;
+  epc_burned_from_submit_fees: number;
+  fees_paid_to_creators_eth: number;
+  ideas_submitted: number;
 }
 
-export interface WhyInfo {
-  window: string | null;
-  window_reason: string | null;
-  lore_summary: string | null;
-  model_run_id: string | number | null;
-  why_hash: string | null;
+export interface Rules {
+  max_ideas_per_day: number;
+  submit_fee_epc: number;
+  vote_min_epc: number;
+  vote_min_wallet_age_days: number;
+  vote_changes_per_hour: number;
+  win_cooldown_days: number;
+  weights: { credibility: number; golem: number; vote: number };
+  chain_id: number;
+  epc_token: string;
+  burn_address: string;
+  similarity_threshold: number;
+  login_configured: boolean;
+  x_login_configured: boolean;
 }
 
-export interface HookRules {
-  hook_address: string | null;
-  lp_lock_address: string | null;
-  lp_lock_until: string | null;
-  anti_snipe_blocks: number | null;
-  wallet_cap_pct: number | null;
-  wallet_cap_minutes: number | null;
-  min_liquidity_usd: number | null;
+export interface Schedule {
+  submit_opens_hour_utc: number;
+  submit_closes_hour_utc: number;
+  vote_closes_hour_utc: number;
+  announce_minute_utc: number;
+  launch_window_hours: number;
+}
+
+export interface LastRound {
+  round_date: string;
+  status: string;
+  no_launch_reason: string | null;
+  winner: PublicIdea | null;
+  n_ideas: number | null;
+  n_votes: number | null;
+}
+
+export interface RoundPayload {
+  round_date: string;
+  phase: Phase;
+  status: string;
+  now: string;
+  next: { label: NextLabel; at: string };
+  slots: { used: number; max: number };
+  pool_visible: boolean;
+  ideas: PublicIdea[];
+  n_ideas_approved: number | null;
+  n_votes: number | null;
+  winner: Winner | null;
+  no_launch_reason: string | null;
+  scoreboard_available: boolean;
+  last_round: LastRound | null;
+  totals: RoundTotals;
+  rules: Rules;
+  schedule: Schedule;
+}
+
+export interface Me {
+  wallet: string | null;
+  x: { handle: string | null; verified: boolean | null; followers: number | null } | null;
+  is_team: boolean;
+  my_vote: { round_date: string; idea_id: string } | null;
+  submitted_today: boolean;
+}
+
+export interface ScoreRow {
+  rank: number;
+  idea_id: string;
+  name: string;
+  ticker: string;
+  x_handle: string | null;
+  credibility: number;
+  golem: number;
+  vote: number;
+  final: number;
+  votes: number;
+  image_url: string;
+  winner: boolean;
+}
+
+export interface Scoreboard {
+  round_date: string;
+  status: string;
+  rows: ScoreRow[];
+  scoreboard_sha256: string | null;
+  formula: string;
+  n_ideas: number | null;
+  n_votes: number | null;
+  no_launch_reason: string | null;
+  announced_at: string | null;
+}
+
+export interface Problem {
+  field: string;
+  code: string;
+  message: string;
+}
+
+export interface ApiErrorDetail {
+  code: string;
+  message: string;
+  problems?: Problem[];
+  reason?: string;
+}
+
+// ---- Forged tokens (archive) ----
+
+export interface Distribution {
+  tx_hash: string;
+  tx_url: string;
+  at: string;
+  creator_eth: number;
+  burn_eth: number;
+  epc_burned: number;
 }
 
 export interface Launch {
@@ -60,46 +161,39 @@ export interface Launch {
   liquidity_usd: number | null;
   volume_24h_usd: number | null;
   holders: number | null;
-  top10_holder_pct: number | null;
   verdict: Verdict;
   verdict_at: string | null;
-  fees_usd: number | null;
-  epc_burned: number | null;
   stale: boolean;
   stale_age_s: number | null;
   market_updated_at: string | null;
   links: { blockscout_token: string; launch_tx: string; dexscreener: string };
-  why: WhyInfo;
-  rules: HookRules;
-  rules_pending: boolean;
-  fee_router_address: string | null;
   share_text: string;
+  // registry facts (community launches)
+  community?: boolean;
+  idea_id?: string;
+  image_url?: string;
+  creator_handle?: string | null;
+  round_date?: string;
+  splitter_address?: string | null;
+  fees_to_creator_eth?: number;
+  epc_burned_from_fees?: number;
+  distributions?: Distribution[];
+  scoreboard_url?: string;
 }
 
-export interface GoForgePayload {
-  gate: Gate | null; // null when the Desk data the gate depends on could not be read
-  totals: GoForgeTotals;
+export interface LaunchesPayload {
   launches: Launch[];
+  totals: RoundTotals;
   generated_at: string;
 }
 
-export interface HistoryPoint {
-  ts: string;
-  mc_usd: number;
-  price_usd: number | null;
-}
-
-export interface GoForgeHistory {
-  target_mc_usd: number;
-  window_hours: number;
-  points: HistoryPoint[];
-}
-
 // WS events on /stream
-export type GoForgeEvent =
-  | { goforge_update: Launch }
-  | { goforge_verdict: { id: string; verdict: Verdict; verdict_at: string | null; launch: Launch } }
-  | { goforge_burn: { id: string; epc_burned: number | null; delta: number } };
+export type GfEvent =
+  | { gf_vote: { round_date: string; votes: Record<string, number> } }
+  | { gf_phase: { round_date: string; phase: Phase } }
+  | { gf_winner: { round_date: string; idea_id: string; name: string; ticker: string } }
+  | { gf_launch: { idea_id: string; ca: string } }
+  | { gf_verdict: { idea_id: string; verdict: Verdict } };
 
 // ---- Formatting: null is a dash, never 0 / NaN / "undefined" ----
 
@@ -125,6 +219,9 @@ export const fmtTokens = (v: number | null | undefined) =>
   v === null || v === undefined || !Number.isFinite(v)
     ? '—'
     : v >= 1e6 ? `${(v / 1e6).toFixed(2)}M` : v >= 1e3 ? `${(v / 1e3).toFixed(1)}K` : v.toFixed(v < 10 ? 2 : 0);
+
+export const fmtEth = (v: number | null | undefined) =>
+  v === null || v === undefined || !Number.isFinite(v) ? '—' : `${Number(v.toFixed(v >= 1 ? 2 : 4))} ETH`;
 
 export const shortAddr = (a: string | null | undefined) => (a ? `${a.slice(0, 6)}…${a.slice(-4)}` : '—');
 
@@ -154,3 +251,17 @@ export const secondsToVerdict = (launchedAt: string | null, windowHours: number,
 
 export const VERDICT_WINDOW_H = 48;
 export const TARGET_MC_USD = 30_000;
+
+// ---- Price history of a launched token (first 48 hours) ----
+
+export interface HistoryPoint {
+  ts: string;
+  mc_usd: number;
+  price_usd: number | null;
+}
+
+export interface GoForgeHistory {
+  target_mc_usd: number;
+  window_hours: number;
+  points: HistoryPoint[];
+}

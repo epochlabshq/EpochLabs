@@ -1,5 +1,5 @@
 """
-GoForge domain logic. Pure functions only (no I/O), so the verdict, the gate, visibility and the null-handling
+GoForge domain logic. Pure functions only (no I/O), so the verdict, visibility and the null-handling
 are unit-testable.
 
 Rules (Developer Brief: GoForge):
@@ -17,7 +17,6 @@ from typing import Iterable, Optional
 from app.core.goforge_config import LaunchEntry
 
 VERDICTS = ("pending", "reached_30k", "stalled")
-GATE_STATUSES = ("locked", "ready", "forging", "cooldown")
 DEAD_ADDRESS = "0x000000000000000000000000000000000000dead"
 
 # Fields the Why card carries; the API echoes them from the config, it never rewrites them
@@ -63,54 +62,6 @@ def seconds_to_verdict(verdict: str, launched_at: Optional[datetime], now: datet
     if verdict != "pending" or launched_at is None:
         return None
     return max(0, int((window_end(launched_at, hours) - now).total_seconds()))
-
-
-# ---------------------------------------------------------------------------
-# Launch Gate
-# ---------------------------------------------------------------------------
-
-def evaluate_gate(*, closed_trades: int, min_trades: int, net_pnl_eth: Optional[float], model_fix_done: bool,
-                  last_launch_at: Optional[datetime], cooldown_days: int, balance_eth: Optional[float],
-                  reserve_eth: float, pending_launch: bool, now: datetime) -> dict:
-    """
-    The five conditions that must all hold before Golem launches again.
-    status: forging while a launch is inside its 48h window; cooldown when the cooldown is the only thing
-    left; ready when everything holds; locked otherwise.
-    """
-    cooldown_until = last_launch_at + timedelta(days=cooldown_days) if last_launch_at else None
-    cooldown_ok = cooldown_until is None or now >= cooldown_until
-    conditions = [
-        {"key": "trading_proof", "label": f"{min_trades} real trades closed", "current": closed_trades,
-         "target": min_trades, "passed": closed_trades >= min_trades},
-        {"key": "track_record", "label": "Net PnL positive after gas",
-         "passed": net_pnl_eth is not None and net_pnl_eth > 0},
-        {"key": "model_fix", "label": "Model retrained on entry-time signals", "passed": bool(model_fix_done)},
-        {"key": "cooldown", "label": f"{cooldown_days} days since last launch", "passed": cooldown_ok},
-        {"key": "capital", "label": "Launch reserve funded", "current": balance_eth, "target": reserve_eth,
-         "passed": balance_eth is not None and balance_eth >= reserve_eth},
-    ]
-    blocked_by = [c["key"] for c in conditions if not c["passed"]]
-    if pending_launch:
-        status = "forging"
-    elif not blocked_by:
-        status = "ready"
-    elif blocked_by == ["cooldown"]:
-        status = "cooldown"
-    else:
-        status = "locked"
-    return {
-        "status": status,
-        "blocked_by": blocked_by,
-        "conditions": conditions,
-        "next_launch_possible_at": None if cooldown_ok or cooldown_until is None else cooldown_until.isoformat(),
-    }
-
-
-def net_pnl_after_gas(realized_eth: Optional[float], closed_trades: int, gas_eth_per_tx: float) -> Optional[float]:
-    """Realized PnL minus an estimate of gas (a buy and a sell per closed trade). None when PnL is unknown."""
-    if realized_eth is None:
-        return None
-    return realized_eth - 2 * closed_trades * gas_eth_per_tx
 
 
 # ---------------------------------------------------------------------------
