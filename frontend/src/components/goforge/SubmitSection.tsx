@@ -85,7 +85,7 @@ export const SubmitSection: React.FC<Props> = ({ round, busy, actionErrors, conn
     return () => { cancelled = true; };
   }, [me?.wallet, me?.submitted_today, version]);
 
-  const open = round?.phase === 'submit';
+  const open = round?.phase === 'submit' || !!round?.dev_open;
   const rules = round?.rules;
   const fee = rules?.submit_fee_epc ?? 0;
   const left = round ? secondsUntil(round.next.at, now) : 0;

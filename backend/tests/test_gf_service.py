@@ -204,6 +204,15 @@ class TestSubmit(PgCase):
         self.err(go, 409, "submissions_closed")
         self.err(lambda db: self._at(db, chain, T(21)), 409, "submissions_closed")
 
+    def test_dev_open_flag_accepts_a_submission_at_any_hour(self):
+        chain = FakeChain()
+
+        async def go(db):
+            a = await self.creator(db, 1)
+            return await self.submit(db, chain, a, now=T(21))
+        with mock.patch.object(svc.settings, "GF_DEV_OPEN", True):
+            self.assertIn("idea_id", run(go))
+
     async def _at(self, db, chain, now):
         a = await self.creator(db, 1)
         await self.submit(db, chain, a, now=now)

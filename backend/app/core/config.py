@@ -240,6 +240,8 @@ class Settings(BaseSettings):
     GF_EXTRA_BLOCKED_NAMES: str = os.getenv("GF_EXTRA_BLOCKED_NAMES", "")
     # Announcements on X: live only with TWITTER_AUTO_POST_ENABLED as well, otherwise dry runs
     # Longest post the X account can send (weighted). 280 for a standard account; X Premium allows far more.
+    # Development only: submissions and votes are open at any hour. The round clock, scoring and the worker are untouched.
+    GF_DEV_OPEN: bool = os.getenv("GF_DEV_OPEN", "false").lower() in ("true", "1", "yes")
     GF_X_MAX_CHARS: int = int(os.getenv("GF_X_MAX_CHARS", "280"))
     GF_X_POST_ENABLED: bool = os.getenv("GF_X_POST_ENABLED", "false").lower() in ("true", "1", "yes")
 

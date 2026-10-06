@@ -96,7 +96,7 @@ async def submit_idea(db, deps: Deps, *, wallet: str, name: str, ticker: str, lo
                       now: datetime) -> dict:
     sch = deps.schedule
     wallet = wallet.lower()
-    if not gf_rounds.submit_open(now, sch):
+    if not (settings.GF_DEV_OPEN or gf_rounds.submit_open(now, sch)):
         raise ServiceError(409, "submissions_closed", "Submissions are closed. They open again at "
                            f"{sch.open_hour:02d}:00 UTC.")
     creator = await gf_store.creator_by_wallet(db, wallet)
@@ -196,7 +196,7 @@ async def cast_vote(db, deps: Deps, *, wallet: str, idea_id: str, round_date: st
                     now: datetime) -> dict:
     sch = deps.schedule
     wallet = wallet.lower()
-    if not gf_rounds.vote_open(now, sch):
+    if not (settings.GF_DEV_OPEN or gf_rounds.vote_open(now, sch)):
         raise ServiceError(409, "voting_closed", "Voting is not open right now.")
     current = gf_rounds.round_date_at(now, sch)
     if round_date != current.isoformat():

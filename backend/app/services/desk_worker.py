@@ -44,11 +44,11 @@ _last_scores_ts = 0.0
 _last_pinned_ts = 0.0
 _last_pinned_holders_ts = 0.0
 
-DISCOVERY_INTERVAL = 900.0   # 15 minutes
-HOLDERS_INTERVAL = 900.0     # 15 minutes
-SCORES_INTERVAL = 600.0      # 10 minutes
-PINNED_INTERVAL = 600.0      # 10 minutes
-PINNED_HOLDERS_INTERVAL = 1800.0  # 30 minutes: a full-life replay per token is slow
+DISCOVERY_INTERVAL = 3600.0  # 1 hour
+HOLDERS_INTERVAL = 3600.0     # 1 hour
+SCORES_INTERVAL = 1800.0     # 30 minutes
+PINNED_INTERVAL = 1800.0      # 30 minutes
+PINNED_HOLDERS_INTERVAL = 7200.0  # 2 hours: a full-life replay per token is slow
 
 
 async def score_watching(db) -> int:
