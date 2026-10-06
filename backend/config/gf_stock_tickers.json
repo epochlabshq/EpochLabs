@@ -1,0 +1,24 @@
+{
+  "_comment": "Large NYSE / Nasdaq tickers that a GoForge ticker must not collide with. Upper case. This is a curated list, not an exchange feed: extend it with GF_EXTRA_STOCK_TICKERS (comma separated).",
+  "tickers": [
+    "AAPL", "MSFT", "GOOGL", "GOOG", "AMZN", "NVDA", "META", "TSLA", "BRK", "AVGO", "LLY", "JPM", "V", "UNH", "XOM",
+    "MA", "COST", "HD", "PG", "JNJ", "NFLX", "ABBV", "BAC", "CRM", "CVX", "MRK", "KO", "WMT", "AMD", "PEP", "ADBE",
+    "TMO", "LIN", "ACN", "MCD", "CSCO", "ABT", "WFC", "DIS", "GE", "TMUS", "IBM", "PM", "NOW", "CAT", "ISRG", "QCOM",
+    "VZ", "TXN", "INTU", "AMGN", "DHR", "BKNG", "AXP", "SPGI", "GS", "RTX", "PFE", "NEE", "UNP", "LOW", "HON",
+    "T", "AMAT", "MS", "UBER", "BLK", "PGR", "ELV", "BSX", "COP", "SYK", "TJX", "LMT", "VRTX", "SCHW", "C", "MDT",
+    "ETN", "ADP", "PANW", "REGN", "CB", "MU", "FI", "MMC", "BX", "SBUX", "ADI", "PLD", "GILD", "BMY", "KLAC", "LRCX",
+    "DE", "MDLZ", "CI", "SO", "AMT", "ANET", "INTC", "CMG", "MO", "ICE", "DUK", "SHW", "ZTS", "NKE", "WM", "CME",
+    "TT", "APH", "EQIX", "UPS", "CDNS", "SNPS", "MCK", "ITW", "CL", "PYPL", "MAR", "EOG", "TGT", "BDX", "PH", "ORLY",
+    "NOC", "CSX", "FCX", "ECL", "ABNB", "APD", "MSI", "EMR", "HCA", "PNC", "USB", "GD", "AON", "CTAS", "FDX", "ROP",
+    "MCO", "COF", "TFC", "BA", "NSC", "AIG", "MET", "AFL", "PSX", "SLB", "OXY", "KMI", "WMB", "HLT", "DLR", "O",
+    "F", "GM", "TM", "HMC", "STLA", "RIVN", "LCID", "NIO", "XPEV", "LI", "SHOP", "SQ", "COIN", "MSTR", "HOOD", "SOFI",
+    "PLTR", "SNOW", "DDOG", "NET", "CRWD", "ZS", "OKTA", "MDB", "TEAM", "WDAY", "ADSK", "TTD", "ROKU", "SPOT", "SNAP",
+    "PINS", "RBLX", "U", "EA", "TTWO", "ATVI", "ZM", "DOCU", "TWLO", "SE", "BABA", "JD", "PDD", "BIDU", "TCEHY",
+    "TSM", "ASML", "ARM", "SMCI", "MRVL", "ON", "NXPI", "MCHP", "WDC", "STX", "DELL", "HPQ", "HPE", "ORCL", "SAP",
+    "SONY", "NTDOY", "LVMUY", "NVO", "AZN", "SNY", "GSK", "NVS", "RHHBY", "TTE", "SHEL", "BP", "RIO", "BHP", "VALE",
+    "KHC", "GIS", "K", "HSY", "CPB", "SJM", "CAG", "STZ", "TAP", "BUD", "DEO", "PEP", "MNST", "KDP", "CELH",
+    "YUM", "DPZ", "QSR", "DRI", "CMG", "WEN", "JACK", "SBUX", "DNUT", "LULU", "UAA", "VFC", "PVH", "RL", "TPR", "CPRI",
+    "DAL", "UAL", "AAL", "LUV", "JBLU", "ALK", "CCL", "RCL", "NCLH", "MGM", "LVS", "WYNN", "CZR", "DKNG", "PENN",
+    "EPC", "ECL", "EW", "EL", "COTY", "KMB", "CLX", "CHD", "ENR", "SPB", "NWL"
+  ]
+}

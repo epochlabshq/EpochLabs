@@ -18,7 +18,7 @@ from app.core.goforge_config import GoForgeConfigError, LaunchEntry, goforge_cas
 from app.services import goforge_worker
 from app.services.desk_trading import select_candidates
 from app.services.goforge import (
-    decide_verdict, evaluate_gate, holders_concentration, in_window, net_pnl_after_gas, next_peak, seconds_to_verdict,
+    decide_verdict, holders_concentration, in_window, next_peak, seconds_to_verdict,
     serialize_history, serialize_launch, share_text, strip_cashtag, totals,
 )
 from app.services.goforge_sources import (
@@ -232,59 +232,6 @@ class TestVerdict(unittest.TestCase):
         self.assertEqual(seconds_to_verdict("pending", self.L, self.L + timedelta(hours=47), HOURS), 3600)
         self.assertEqual(seconds_to_verdict("pending", self.L, self.L + timedelta(hours=49), HOURS), 0)
         self.assertIsNone(seconds_to_verdict("stalled", self.L, self.L, HOURS))
-
-
-class TestGate(unittest.TestCase):
-    def gate(self, **kw):
-        base = dict(closed_trades=30, min_trades=30, net_pnl_eth=0.4, model_fix_done=True, last_launch_at=None,
-                    cooldown_days=7, balance_eth=1.0, reserve_eth=0.5, pending_launch=False, now=NOW)
-        base.update(kw)
-        return evaluate_gate(**base)
-
-    def test_ready_when_everything_holds(self):
-        g = self.gate()
-        self.assertEqual((g["status"], g["blocked_by"]), ("ready", []))
-        self.assertEqual([c["key"] for c in g["conditions"]],
-                         ["trading_proof", "track_record", "model_fix", "cooldown", "capital"])
-
-    def test_locked_names_the_blocking_gate(self):
-        g = self.gate(closed_trades=12)
-        self.assertEqual((g["status"], g["blocked_by"]), ("locked", ["trading_proof"]))
-        tp = g["conditions"][0]
-        self.assertEqual((tp["current"], tp["target"], tp["passed"]), (12, 30, False))
-
-    def test_each_condition_blocks_on_its_own(self):
-        cases = {"track_record": dict(net_pnl_eth=-0.01), "model_fix": dict(model_fix_done=False),
-                 "capital": dict(balance_eth=0.1)}
-        for key, kw in cases.items():
-            self.assertEqual(self.gate(**kw)["blocked_by"], [key])
-        self.assertEqual(self.gate(net_pnl_eth=0.0)["blocked_by"], ["track_record"])  # must be strictly positive
-
-    def test_unknown_inputs_never_pass(self):
-        self.assertEqual(self.gate(net_pnl_eth=None)["blocked_by"], ["track_record"])
-        g = self.gate(balance_eth=None)
-        self.assertEqual(g["blocked_by"], ["capital"])
-        self.assertIsNone(g["conditions"][4]["current"])
-
-    def test_cooldown_status_and_next_launch(self):
-        g = self.gate(last_launch_at=NOW - timedelta(days=2))
-        self.assertEqual((g["status"], g["blocked_by"]), ("cooldown", ["cooldown"]))
-        self.assertEqual(g["next_launch_possible_at"], (NOW + timedelta(days=5)).isoformat())
-        g = self.gate(last_launch_at=NOW - timedelta(days=7))
-        self.assertEqual(g["status"], "ready")
-        self.assertIsNone(g["next_launch_possible_at"])
-
-    def test_forging_while_a_launch_is_pending(self):
-        self.assertEqual(self.gate(pending_launch=True, last_launch_at=NOW)["status"], "forging")
-
-    def test_locked_beats_cooldown_when_more_than_cooldown_fails(self):
-        g = self.gate(last_launch_at=NOW - timedelta(days=1), closed_trades=3)
-        self.assertEqual((g["status"], sorted(g["blocked_by"])), ("locked", ["cooldown", "trading_proof"]))
-
-    def test_gas_adjustment(self):
-        self.assertAlmostEqual(net_pnl_after_gas(0.10, 10, 0.001), 0.08)
-        self.assertEqual(net_pnl_after_gas(0.10, 10, 0), 0.10)
-        self.assertIsNone(net_pnl_after_gas(None, 10, 0.001))
 
 
 class TestSerialization(unittest.TestCase):
@@ -589,13 +536,13 @@ class TestWorkerScheduling(unittest.TestCase):
         self.assertEqual(len(goforge_worker.due_entries([e1, e2], 1000.0 + settings.GOFORGE_SETTLED_INTERVAL_SECONDS)), 2)
 
     def test_empty_registry_does_no_database_work(self):
-        with mock.patch.object(goforge_worker, "load_launches", return_value=[]), \
+        with mock.patch.object(goforge_worker, "all_entries", return_value=[]), \
              mock.patch.object(goforge_worker, "exclusive", side_effect=AssertionError("touched the DB")), \
              mock.patch.object(goforge_worker, "AsyncSessionLocal", side_effect=AssertionError("touched the DB")):
             asyncio.run(goforge_worker.run_goforge_cycle())
 
     def test_broken_config_skips_the_cycle(self):
-        with mock.patch.object(goforge_worker, "load_launches", side_effect=GoForgeConfigError("bad")), \
+        with mock.patch.object(goforge_worker, "all_entries", side_effect=GoForgeConfigError("bad")), \
              mock.patch.object(goforge_worker, "exclusive", side_effect=AssertionError("touched the DB")):
             asyncio.run(goforge_worker.run_goforge_cycle())
 
@@ -610,29 +557,17 @@ class TestPayloadLeaks(unittest.TestCase):
         public = row()
         entries = {"forge-001": entry(), "forge-002": entry(id="forge-002", ca=secret_ca)}
         with mock.patch.object(api, "_entries_by_id", return_value=entries):
-            payload = api.build_goforge_payload([public, hidden], {}, None, NOW)
+            payload = api.build_launches_payload([public, hidden], {}, NOW)
         blob = json.dumps(payload)
         for secret in (secret_ca, "SecretName", "SECRETSYM", "forge-002"):
             self.assertNotIn(secret, blob)
         self.assertEqual(payload["totals"]["launches"], 1)
         self.assertEqual([c["id"] for c in payload["launches"]], ["forge-001"])
 
-    def test_hidden_launch_does_not_start_a_cooldown_or_forge_status(self):
-        from app.api import goforge_endpoints as api
-        hidden = row(id="forge-002", pool_active_at=None, launched_at=NOW)
-        desk = {"closed": 30, "realized_eth": 1.0, "balance_eth": 1.0}
-        with mock.patch.object(settings, "GOFORGE_MODEL_FIX_DONE", True):
-            g = api.build_gate([hidden], desk, NOW)
-        self.assertEqual(g["status"], "ready")
-
-    def test_gate_is_none_when_desk_data_is_unavailable(self):
-        from app.api import goforge_endpoints as api
-        self.assertIsNone(api.build_gate([], None, NOW))
-
     def test_empty_state(self):
         from app.api import goforge_endpoints as api
         with mock.patch.object(api, "_entries_by_id", return_value={}):
-            payload = api.build_goforge_payload([], {}, None, NOW)
+            payload = api.build_launches_payload([], {}, NOW)
         self.assertEqual(payload["launches"], [])
         self.assertEqual(payload["totals"]["launches"], 0)
 

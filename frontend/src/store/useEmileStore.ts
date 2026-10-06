@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type { EpochEvent, EpochsPayload } from '@/components/epochs/types';
 import type { ClosedTrade, DeskEvent, DeskPayload, OpenTrade } from '@/components/desk/types';
-import type { GoForgeEvent, GoForgePayload, GoForgeTotals, Launch } from '@/components/goforge/types';
+import type { GfEvent, LaunchesPayload, Me, RoundPayload } from '@/components/goforge/types';
 
 export interface TokenItem {
   mint: string;
@@ -81,11 +81,15 @@ interface EmileState {
   deskVersion: number;
   deskFlashId: string | null;
 
-  // GoForge (/api/goforge). WS goforge_* events patch it in place; `goforgeVersion` bumps to trigger a refetch.
-  goforge: GoForgePayload | null;
-  goforgeError: boolean;
-  goforgeVersion: number;
-  goforgeFlashId: string | null;
+  // GoForge registry. Round, launches and the viewer are fetched by useGoForge; WS gf_* / goforge_* events patch the vote
+  // counts in place and bump `gfVersion` so everything else is read again.
+  gfRound: RoundPayload | null;
+  gfRoundError: boolean;
+  // server clock minus this browser's clock at the last read: countdowns follow the server, not a wrong local clock
+  gfClockOffsetMs: number;
+  gfLaunches: LaunchesPayload | null;
+  gfMe: Me | null;
+  gfVersion: number;
 
   // Interactive Simulation state
   simState: {
@@ -107,31 +111,16 @@ interface EmileState {
   requestEpochsRefresh: () => void;
   setDesk: (payload: DeskPayload | null, error?: boolean) => void;
   onDeskEvent: (evt: DeskEvent) => void;
-  setGoForge: (payload: GoForgePayload | null, error?: boolean) => void;
-  onGoForgeEvent: (evt: GoForgeEvent) => void;
+  setGfRound: (payload: RoundPayload | null, error?: boolean) => void;
+  setGfLaunches: (payload: LaunchesPayload | null) => void;
+  setGfMe: (me: Me | null) => void;
+  onGfEvent: (evt: GfEvent) => void;
+  bumpGf: () => void;
   setSimParams: (params: Partial<{ n: number; auc: number; d: number; running: boolean }>) => void;
   resetSim: () => void;
 }
 
 const HUES = [38, 152, 268, 196, 12, 88, 320];
-
-const launchedAtMs = (l: Launch) => (l.launched_at ? new Date(l.launched_at).getTime() : 0);
-
-/** Counters from the launch list. Fees and burn are only known server-side: keep the last totals for those. */
-function recount(launches: Launch[], prev: GoForgeTotals): GoForgeTotals {
-  return {
-    ...prev,
-    launches: launches.length,
-    reached_30k: launches.filter((l) => l.verdict === 'reached_30k').length,
-    stalled: launches.filter((l) => l.verdict === 'stalled').length,
-    pending: launches.filter((l) => l.verdict === 'pending').length,
-  };
-}
-
-function upsertLaunch(g: GoForgePayload, launch: Launch): GoForgePayload {
-  const launches = [launch, ...g.launches.filter((l) => l.id !== launch.id)].sort((a, b) => launchedAtMs(b) - launchedAtMs(a));
-  return { ...g, launches, totals: recount(launches, g.totals) };
-}
 
 export const useEmileStore = create<EmileState>((set, get) => ({
   isConnected: true,
@@ -170,10 +159,12 @@ export const useEmileStore = create<EmileState>((set, get) => ({
   deskVersion: 0,
   deskFlashId: null,
 
-  goforge: null,
-  goforgeError: false,
-  goforgeVersion: 0,
-  goforgeFlashId: null,
+  gfRound: null,
+  gfRoundError: false,
+  gfClockOffsetMs: 0,
+  gfLaunches: null,
+  gfMe: null,
+  gfVersion: 0,
 
   simState: {
     n: 0,
@@ -266,21 +257,22 @@ export const useEmileStore = create<EmileState>((set, get) => ({
     };
   }),
 
-  setGoForge: (payload, error = false) => set(payload ? { goforge: payload, goforgeError: false } : { goforgeError: error }),
+  setGfRound: (payload, error = false) => set(payload
+    ? { gfRound: payload, gfRoundError: false, gfClockOffsetMs: Date.parse(payload.now) - Date.now() }
+    : { gfRoundError: error }),
+  setGfLaunches: (payload) => set({ gfLaunches: payload }),
+  setGfMe: (me) => set({ gfMe: me }),
+  bumpGf: () => set((state) => ({ gfVersion: state.gfVersion + 1 })),
 
-  onGoForgeEvent: (evt) => set((state) => {
-    const bump = { goforgeVersion: state.goforgeVersion + 1 };
-    const g = state.goforge;
-    if (!g) return bump;
-    if ('goforge_update' in evt) {
-      return { ...bump, goforgeFlashId: evt.goforge_update.id, goforge: upsertLaunch(g, evt.goforge_update) };
+  onGfEvent: (evt) => set((state) => {
+    const bump = { gfVersion: state.gfVersion + 1 };
+    // A vote only changes counts: patch them at once, the next read confirms them
+    if ('gf_vote' in evt && state.gfRound && evt.gf_vote.round_date === state.gfRound.round_date) {
+      const votes = evt.gf_vote.votes;
+      const ideas = state.gfRound.ideas.map((i) => ({ ...i, votes: votes[i.idea_id] ?? 0 }));
+      return { gfRound: { ...state.gfRound, ideas, n_votes: Object.values(votes).reduce((a, b) => a + b, 0) } };
     }
-    if ('goforge_verdict' in evt) {
-      return { ...bump, goforgeFlashId: evt.goforge_verdict.id, goforge: upsertLaunch(g, evt.goforge_verdict.launch) };
-    }
-    const { id, epc_burned } = evt.goforge_burn;
-    const launches = g.launches.map((l) => (l.id === id ? { ...l, epc_burned } : l));
-    return { ...bump, goforgeFlashId: id, goforge: { ...g, launches } };
+    return bump;
   }),
 
   setSimParams: (params) => set((state) => ({ simState: { ...state.simState, ...params } })),

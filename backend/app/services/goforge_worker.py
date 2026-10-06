@@ -22,7 +22,7 @@ from sqlalchemy import text
 from app.api.goforge_endpoints import invalidate_goforge_cache, load_rows, serialize_rows
 from app.api.websocket import manager
 from app.core.config import settings
-from app.core.goforge_config import GoForgeConfigError, LaunchEntry, load_launches
+from app.core.goforge_config import GoForgeConfigError, LaunchEntry, all_entries
 from app.db.database import AsyncSessionLocal
 from app.db.goforge_schema import ensure_goforge_schema
 from app.db.locks import exclusive
@@ -201,7 +201,7 @@ def due_entries(entries: list[LaunchEntry], now_ts: float) -> list[LaunchEntry]:
 
 async def run_goforge_cycle(sources=None) -> None:
     try:
-        entries = load_launches()
+        entries = all_entries()
     except (GoForgeConfigError, ValueError, OSError) as e:
         print(f"[GOFORGE WORKER] Config unreadable, skipping cycle: {e}", flush=True)
         return

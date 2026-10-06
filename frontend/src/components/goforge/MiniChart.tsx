@@ -7,7 +7,7 @@ import { fmtUsd, TARGET_MC_USD, VERDICT_WINDOW_H, type GoForgeHistory } from './
 const W = 320;
 const H = 96;
 const PAD = { l: 4, r: 4, t: 8, b: 14 };
-const REFRESH_MS = 60_000;
+const REFRESH_MS = 300_000;
 
 /** Market cap over the first 48 hours with a dashed line at the $30K target. */
 export const MiniChart: React.FC<{ id: string; launchedAt: string | null; live: boolean }> = ({ id, launchedAt, live }) => {

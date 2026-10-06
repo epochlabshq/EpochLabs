@@ -14,3 +14,9 @@ httpx>=0.26.0
 python-dotenv>=1.0.1
 # Radar lore embeddings (MiniLM through ONNX, no torch)
 fastembed>=0.3.0
+
+# GoForge Registry: SIWE / EIP-712 signature recovery, session tokens (coincurve makes recovery ~100x faster)
+eth-account>=0.13
+coincurve>=19.0
+PyJWT>=2.8
+python-multipart>=0.0.9
