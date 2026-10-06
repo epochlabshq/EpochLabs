@@ -41,7 +41,14 @@ function toDisc(points: RadarPoint[]): { x: number; z: number; p: RadarPoint }[]
     const n = v.length;
     const order = v.map((a, i) => [a, i] as const).sort((a, b) => a[0] - b[0]);
     const rank = new Array<number>(n);
-    order.forEach(([, i], r) => { rank[i] = n > 1 ? r / (n - 1) : 0.5; });
+    // Equal values share one (average) rank: identical lore must stay one stack, not be spread into a line
+    for (let s = 0; s < n; ) {
+      let e = s;
+      while (e + 1 < n && order[e + 1][0] === order[s][0]) e++;
+      const r = n > 1 ? (s + e) / 2 / (n - 1) : 0.5;
+      for (let k = s; k <= e; k++) rank[order[k][1]] = r;
+      s = e + 1;
+    }
     const lo = order[Math.floor((n - 1) * 0.02)][0];
     const hi = order[Math.ceil((n - 1) * 0.98)][0];
     return v.map((a, i) => (1 - BLEND) * Math.min(Math.max((a - lo) / (hi - lo || 1), 0), 1) + BLEND * rank[i]);
@@ -56,12 +63,18 @@ function toDisc(points: RadarPoint[]): { x: number; z: number; p: RadarPoint }[]
     s.n += 1;
     sums.set(p.cluster_id, s);
   });
+  const seen = new Map<string, number>();
   return points.map((p, i) => {
     const s = sums.get(p.cluster_id)!;
     const cx = s.x / s.n;
     const cy = s.y / s.n;
-    let x = ((0.5 + (cx - 0.5) * GAP + (xs[i] - cx) * 1.7) * 2 - 1) * 0.9;
-    let z = ((0.5 + (cy - 0.5) * GAP + (ys[i] - cy) * 1.7) * 2 - 1) * 0.9;
+    // Identical lore shares one spot: fan the stack out so each blip stays visible
+    const key = `${p.x}|${p.y}`;
+    const k = seen.get(key) ?? 0;
+    seen.set(key, k + 1);
+    const jr = 0.016 * Math.sqrt(k);
+    let x = ((0.5 + (cx - 0.5) * GAP + (xs[i] - cx) * 1.7) * 2 - 1) * 0.9 + Math.cos(k * 2.399963) * jr;
+    let z = ((0.5 + (cy - 0.5) * GAP + (ys[i] - cy) * 1.7) * 2 - 1) * 0.9 + Math.sin(k * 2.399963) * jr;
     const r = Math.hypot(x, z);
     if (r > 0.94) {
       x = (x / r) * 0.94;
