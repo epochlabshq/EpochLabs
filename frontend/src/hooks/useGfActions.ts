@@ -42,6 +42,15 @@ export function useGfActions(refreshMe: () => Promise<void>) {
   // Set when the user pressed Connect and the wallet picker is open: sign in as soon as a wallet is connected
   const pendingLogin = useRef(false);
 
+  // The pool and the vote counts must show a change at once: read the round now instead of waiting for the delayed refresh
+  const refreshRound = useCallback(async () => {
+    try {
+      useEmileStore.getState().setGfRound(await gfApi.round());
+    } catch {
+      /* the delayed refresh after bumpGf will try again */
+    }
+  }, []);
+
   // An error belongs to the place the user acted: the wallet step, the vote cards or the form. Nothing floats at the top.
   const setError = useCallback((key: ErrorKey, message: string | null) => {
     setErrors((prev) => {
@@ -136,7 +145,7 @@ export function useGfActions(refreshMe: () => Promise<void>) {
         message: { round: typed.message.round, ideaId: typed.message.ideaId, voter: typed.message.voter as Hex, signedAt: BigInt(typed.message.signedAt) },
       });
       await gfApi.vote({ voter: address.toLowerCase(), idea_id: ideaId, round: typed.message.round, signed_at: typed.message.signedAt, signature });
-      await refreshMe();
+      await Promise.all([refreshMe(), refreshRound()]);
       bumpGf();
     } catch (e) {
       fail('vote', e);
@@ -144,7 +153,7 @@ export function useGfActions(refreshMe: () => Promise<void>) {
       setBusy(null);
       setVotingFor(null);
     }
-  }, [address, bumpGf, ensureChain, fail, isConnected, openConnectModal, refreshMe, setError, signTypedDataAsync]);
+  }, [address, bumpGf, ensureChain, fail, isConnected, openConnectModal, refreshMe, refreshRound, setError, signTypedDataAsync]);
 
   /** Burn the submit fee and wait until it is mined. Returns the tx hash, or null when it did not go through. */
   const payFee = useCallback(async (): Promise<string | null> => {
@@ -185,7 +194,7 @@ export function useGfActions(refreshMe: () => Promise<void>) {
     setBusy('submit');
     try {
       const idea = await gfApi.submit(form);
-      await refreshMe();
+      await Promise.all([refreshMe(), refreshRound()]);
       bumpGf();
       return { idea };
     } catch (e) {
@@ -196,7 +205,7 @@ export function useGfActions(refreshMe: () => Promise<void>) {
     } finally {
       setBusy(null);
     }
-  }, [bumpGf, refreshMe, setError]);
+  }, [bumpGf, refreshMe, refreshRound, setError]);
 
   return { busy, errors, setError, votingFor, login, logout, vote, payFee, submit, connected: isConnected, address };
 }
