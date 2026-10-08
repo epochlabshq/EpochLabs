@@ -148,7 +148,7 @@ def build_round_payload(*, now: datetime, sch: gf_rounds.Schedule, rnd: dict, ap
     """GET /round. The pool is hidden until submissions close, so nobody can copy an idea they can already see."""
     phase = gf_rounds.phase_at(now, sch)
     label, at = gf_rounds.next_boundary(now, sch)
-    pool_visible = phase != "submit" or settings.GF_DEV_OPEN
+    pool_visible = phase != "submit" or settings.GF_DEV_OPEN or len(approved) > 0
     announced = rnd["status"] in ("announced", "launched")
     return {
         "round_date": rnd["round_date"].isoformat(), "phase": phase, "status": rnd["status"], "now": now.isoformat(),

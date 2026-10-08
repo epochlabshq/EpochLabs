@@ -9,11 +9,16 @@ export const metadata: Metadata = {
     title: 'The Desk · Epoch Labs',
     description: DESK_HERO.intro,
     url: '/desk',
+    siteName: 'Epoch Labs',
+    type: 'website',
+    images: [{ url: '/epoch-logo.png', width: 512, height: 512, alt: 'Epoch Labs' }],
   },
   twitter: {
     card: 'summary_large_image',
     title: 'The Desk · Epoch Labs',
     description: DESK_HERO.intro,
+    images: ['/epoch-logo.png'],
+    creator: '@EpochLabsHQ',
   },
 };
 
