@@ -1,10 +1,14 @@
 """
-Insert the 4 candidate ideas for Today's pool into the GoForge registry database.
+Insert candidate ideas for Today's pool into the GoForge registry database.
 Tokens:
 1. Spore Keeper (SPORE)
 2. Lantern Frog (LFROG)
 3. Clock Tower (TOWER)
 4. Paper Crane (CRANE)
+5. Moss Oracle (MOSSY)
+6. Ember Fox (EMBFOX)
+7. Tide Turtle (TIDEY)
+8. Night Market Cat (NMCAT)
 """
 import os
 import shutil
@@ -92,6 +96,80 @@ IDEAS_DATA = [
             "wallet": "0xa4d5b228e62573aeb9dd3f554b61ee0953e4b228",
         },
         "logo_path": r"C:\Users\bimo\Downloads\Logo Paper Crane.png",
+    },
+    {
+        "slot": 5,
+        "name": "Moss Oracle",
+        "ticker": "MOSSY",
+        "lore": (
+            "A boulder so old that moss has learned to speak on its behalf. Travellers ask it about the road ahead "
+            "and the moss answers slowly, one patient sentence per season, and it has never once been wrong about the weather. "
+            "The old folk say the best question is the shortest one, because the moss only has the patience to answer questions "
+            "that fit in a breath."
+        ),
+        "creator": {
+            "x_user_id": "1489230182901239805",
+            "x_handle": "SqyH100",
+            "x_followers": 50000,
+            "x_verified": True,
+            "wallet": "0xb5d5c228e62573aeb9dd3f554b61ee0953e4b229",
+        },
+        "logo_path": r"C:\Users\bimo\Downloads\Logo Moss Oracle.png",
+    },
+    {
+        "slot": 6,
+        "name": "Ember Fox",
+        "ticker": "EMBFOX",
+        "lore": (
+            "The ember fox walks through burnt forests and wakes the seeds that fire could not kill. Wherever it sleeps, "
+            "a ring of new green grows by morning, and the villagers leave it warm bread at the edge of the ash. "
+            "Foresters now plant their first sapling where the fox slept, and swear that the ground there stays warm "
+            "through the whole of winter."
+        ),
+        "creator": {
+            "x_user_id": "1489230182901239806",
+            "x_handle": "oSKNYo_dev",
+            "x_followers": 65000,
+            "x_verified": True,
+            "wallet": "0xc6d5c228e62573aeb9dd3f554b61ee0953e4b230",
+        },
+        "logo_path": r"C:\Users\bimo\Downloads\Logo Ember Fox.png",
+    },
+    {
+        "slot": 7,
+        "name": "Tide Turtle",
+        "ticker": "TIDEY",
+        "lore": (
+            "A turtle the size of an island who carries a small village on its shell and swims the same slow circle every year, "
+            "so the villagers always know the season by which coast they can see from their windows. Visitors who stay for a season "
+            "learn to sleep to the rhythm of its swimming, and leave unable to sleep anywhere that stands still."
+        ),
+        "creator": {
+            "x_user_id": "1489230182901239807",
+            "x_handle": "SatosheeshETH",
+            "x_followers": 85000,
+            "x_verified": True,
+            "wallet": "0xd7d5c228e62573aeb9dd3f554b61ee0953e4b231",
+        },
+        "logo_path": r"C:\Users\bimo\Downloads\Logo Tide Turtle.png",
+    },
+    {
+        "slot": 8,
+        "name": "Night Market Cat",
+        "ticker": "NMCAT",
+        "lore": (
+            "A black cat who runs the stall at the night market that only appears when it rains. It sells small jars of lucky silence, "
+            "and the price is always whatever you can honestly afford to give away. Regulars bring jars of their own and swap them at "
+            "the end of the night, and the cat keeps a quiet ledger of every fair trade."
+        ),
+        "creator": {
+            "x_user_id": "1489230182901239808",
+            "x_handle": "2147_Million",
+            "x_followers": 95000,
+            "x_verified": True,
+            "wallet": "0xe8d5c228e62573aeb9dd3f554b61ee0953e4b232",
+        },
+        "logo_path": r"C:\Users\bimo\Downloads\Logo Night Market Cat.png",
     },
 ]
 
@@ -188,7 +266,7 @@ async def run():
             print(f"[+] Upserted idea: {item['name']} (${item['ticker']}) [ID: {idea_id}]")
 
         await db.commit()
-        print("[✓] Finished successfully!")
+        print("[OK] Finished successfully!")
 
 if __name__ == "__main__":
     asyncio.run(run())
